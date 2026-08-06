@@ -1,4 +1,7 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'models/show_item.dart';
@@ -151,6 +154,7 @@ class _DiscoverPageState extends State<DiscoverPage> {
   bool _loading = false;
   String? _error;
   List<ShowItem> _results = const <ShowItem>[];
+  List<String> _interpretation = const <String>[];
 
   static const moods = <String>[
     'Gripping',
@@ -165,18 +169,20 @@ class _DiscoverPageState extends State<DiscoverPage> {
     setState(() {
       _loading = true;
       _error = null;
+      _interpretation = const <String>[];
     });
 
     try {
-      final results = await _api.recommend(
+      final recommendation = await _api.recommend(
         query: _controller.text.trim(),
         mood: _mood,
       );
       if (!mounted) return;
       setState(() {
-        _results = results;
+        _results = recommendation.shows;
+        _interpretation = recommendation.interpretation;
         _loading = false;
-        if (results.isEmpty) {
+        if (recommendation.shows.isEmpty) {
           _error = 'No strong matches were found. Try a broader request.';
         }
       });
@@ -242,7 +248,19 @@ class _DiscoverPageState extends State<DiscoverPage> {
                     ),
                   ),
                 ),
-                const SizedBox(height: 22),
+                const SizedBox(height: 10),
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 4),
+                  child: Text(
+                    'Try: “A completed mystery like Severance, under 45 minutes, not too dark.”',
+                    style: TextStyle(
+                      color: Color(0xFF827C8C),
+                      fontSize: 13,
+                      height: 1.35,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 18),
                 Wrap(
                   spacing: 10,
                   runSpacing: 14,
@@ -315,6 +333,54 @@ class _DiscoverPageState extends State<DiscoverPage> {
                     label: Text(_loading ? 'Finding live picks…' : 'Curate my picks'),
                   ),
                 ),
+                if (_interpretation.isNotEmpty) ...[
+                  const SizedBox(height: 18),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF15111D),
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(color: const Color(0xFF302943)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Row(
+                          children: [
+                            Icon(
+                              Icons.psychology_alt_outlined,
+                              size: 20,
+                              color: Color(0xFFAFA4FF),
+                            ),
+                            SizedBox(width: 8),
+                            Text(
+                              'I understood',
+                              style: TextStyle(fontWeight: FontWeight.w800),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: _interpretation
+                              .map(
+                                (label) => Chip(
+                                  visualDensity: VisualDensity.compact,
+                                  label: Text(label),
+                                  backgroundColor: const Color(0xFF231D34),
+                                  side: const BorderSide(
+                                    color: Color(0xFF40365A),
+                                  ),
+                                ),
+                              )
+                              .toList(),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
                 if (_error != null) ...[
                   const SizedBox(height: 18),
                   Text(
@@ -606,14 +672,23 @@ class _ShowDetailPageState extends State<ShowDetailPage> {
   final ApiService _api = ApiService();
   late bool _saved = widget.saved;
   WatchOptions? _options;
-  bool _loadingOptions = false;
+  bool _loadingOptions = true;
   String? _optionsError;
 
+  @override
+  void initState() {
+    super.initState();
+    _loadOptions();
+  }
+
   Future<void> _loadOptions() async {
-    setState(() {
-      _loadingOptions = true;
-      _optionsError = null;
-    });
+    if (mounted) {
+      setState(() {
+        _loadingOptions = true;
+        _optionsError = null;
+      });
+    }
+
     try {
       final options = await _api.watchOptions(
         showId: widget.show.id,
@@ -633,14 +708,54 @@ class _ShowDetailPageState extends State<ShowDetailPage> {
     }
   }
 
-  Future<void> _open(String url) async {
-    final uri = Uri.tryParse(url);
-    if (uri == null || !await launchUrl(uri, mode: LaunchMode.externalApplication)) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('That viewing link could not be opened.')),
-      );
+  Future<void> _openProvider(WatchProvider provider) async {
+    final candidates = <String?>[
+      if (Platform.isIOS) provider.iosUrl,
+      if (Platform.isAndroid) provider.androidUrl,
+      provider.webUrl,
+    ].whereType<String>();
+
+    for (final value in candidates) {
+      final uri = Uri.tryParse(value);
+      if (uri == null) continue;
+      if (await launchUrl(uri, mode: LaunchMode.externalApplication)) return;
     }
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('${provider.name} could not be opened.')),
+    );
+  }
+
+  Future<void> _shareShow(BuildContext shareContext) async {
+    final show = widget.show;
+    final details = <String>[
+      'I found ${show.title} on ForFlickSakes.',
+      if (show.year > 0) 'Released ${show.year}.',
+      if (show.rating > 0) 'Rating: ${show.rating}/10.',
+      if (show.officialUrl != null) show.officialUrl!,
+    ].join(' ');
+    final box = shareContext.findRenderObject() as RenderBox?;
+
+    await SharePlus.instance.share(
+      ShareParams(
+        text: details,
+        title: 'Share ${show.title}',
+        subject: 'You might like ${show.title}',
+        sharePositionOrigin: box == null
+            ? null
+            : box.localToGlobal(Offset.zero) & box.size,
+      ),
+    );
+  }
+
+  String _providerSubtitle(WatchProvider provider) {
+    final parts = <String>[
+      provider.type.replaceAll('_', ' '),
+      if (provider.format?.isNotEmpty ?? false) provider.format!,
+      if (provider.price != null) provider.price.toString(),
+    ];
+    return parts.join(' · ');
   }
 
   @override
@@ -654,13 +769,25 @@ class _ShowDetailPageState extends State<ShowDetailPage> {
             expandedHeight: 430,
             backgroundColor: const Color(0xFF07070C),
             actions: [
+              Builder(
+                builder: (shareContext) => IconButton(
+                  tooltip: 'Share this series',
+                  onPressed: () => _shareShow(shareContext),
+                  icon: const Icon(Icons.ios_share_rounded),
+                ),
+              ),
               IconButton(
+                tooltip: _saved
+                    ? 'Remove from watchlist'
+                    : 'Save to watchlist',
                 onPressed: () {
                   widget.onToggleSaved();
                   setState(() => _saved = !_saved);
                 },
                 icon: Icon(
-                  _saved ? Icons.bookmark_rounded : Icons.bookmark_border_rounded,
+                  _saved
+                      ? Icons.bookmark_rounded
+                      : Icons.bookmark_border_rounded,
                 ),
               ),
             ],
@@ -668,7 +795,11 @@ class _ShowDetailPageState extends State<ShowDetailPage> {
               background: Stack(
                 fit: StackFit.expand,
                 children: [
-                  _Poster(url: show.poster, width: double.infinity, height: 430),
+                  _Poster(
+                    url: show.poster,
+                    width: double.infinity,
+                    height: 430,
+                  ),
                   const DecoratedBox(
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
@@ -691,7 +822,10 @@ class _ShowDetailPageState extends State<ShowDetailPage> {
             padding: const EdgeInsets.fromLTRB(24, 8, 24, 44),
             sliver: SliverList.list(
               children: [
-                Text(show.title, style: Theme.of(context).textTheme.headlineLarge),
+                Text(
+                  show.title,
+                  style: Theme.of(context).textTheme.headlineLarge,
+                ),
                 const SizedBox(height: 12),
                 Text(
                   [
@@ -712,67 +846,106 @@ class _ShowDetailPageState extends State<ShowDetailPage> {
                 const SizedBox(height: 22),
                 Text('About', style: Theme.of(context).textTheme.titleLarge),
                 const SizedBox(height: 10),
-                Text(show.summary, style: Theme.of(context).textTheme.bodyLarge),
-                const SizedBox(height: 30),
-                SizedBox(
-                  height: 58,
-                  child: FilledButton.icon(
-                    onPressed: _loadingOptions ? null : _loadOptions,
-                    icon: _loadingOptions
-                        ? const SizedBox.square(
-                            dimension: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2.3),
-                          )
-                        : const Icon(Icons.play_arrow_rounded),
-                    label: Text(
-                      _loadingOptions ? 'Checking…' : 'Where to watch',
-                    ),
-                  ),
+                Text(
+                  show.summary,
+                  style: Theme.of(context).textTheme.bodyLarge,
                 ),
-                if (_optionsError != null) ...[
-                  const SizedBox(height: 12),
-                  Text(
-                    _optionsError!,
-                    style: const TextStyle(color: Color(0xFFFFA3A3)),
-                  ),
-                ],
-                if (_options != null) ...[
-                  const SizedBox(height: 24),
-                  Text(
-                    _options!.verified
-                        ? 'Verified viewing options'
-                        : 'Viewing search',
-                    style: Theme.of(context).textTheme.titleLarge,
-                  ),
-                  const SizedBox(height: 12),
-                  if (_options!.providers.isNotEmpty)
-                    ..._options!.providers.map(
-                      (provider) => Card(
-                        child: ListTile(
-                          leading: const Icon(Icons.ondemand_video_rounded),
-                          title: Text(provider.name),
-                          subtitle: Text(provider.type),
-                          trailing: const Icon(Icons.open_in_new_rounded),
-                          onTap: () => _open(
-                            provider.webUrl ?? _options!.fallbackUrl,
-                          ),
+                const SizedBox(height: 30),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () {
+                          widget.onToggleSaved();
+                          setState(() => _saved = !_saved);
+                        },
+                        icon: Icon(
+                          _saved
+                              ? Icons.bookmark_rounded
+                              : Icons.bookmark_border_rounded,
+                        ),
+                        label: Text(_saved ? 'Saved' : 'Save'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Builder(
+                        builder: (shareContext) => OutlinedButton.icon(
+                          onPressed: () => _shareShow(shareContext),
+                          icon: const Icon(Icons.share_outlined),
+                          label: const Text('Share series'),
                         ),
                       ),
-                    )
-                  else
-                    SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton.icon(
-                        onPressed: () => _open(_options!.fallbackUrl),
-                        icon: const Icon(Icons.search_rounded),
-                        label: const Text('Search current viewing options'),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 32),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'Where to watch',
+                        style: Theme.of(context).textTheme.titleLarge,
                       ),
                     ),
-                  const SizedBox(height: 10),
+                    IconButton(
+                      tooltip: 'Refresh availability',
+                      onPressed: _loadingOptions ? null : _loadOptions,
+                      icon: const Icon(Icons.refresh_rounded),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Availability for ${widget.region}. Tap a service to open its app or website.',
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+                const SizedBox(height: 14),
+                if (_loadingOptions)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 24),
+                    child: Center(child: CircularProgressIndicator()),
+                  )
+                else if (_optionsError != null)
+                  _AvailabilityMessage(
+                    icon: Icons.cloud_off_rounded,
+                    message: _optionsError!,
+                    actionLabel: 'Try again',
+                    onAction: _loadOptions,
+                  )
+                else if (_options == null || _options!.providers.isEmpty)
+                  _AvailabilityMessage(
+                    icon: Icons.tv_off_outlined,
+                    message: _options?.message ??
+                        'No verified streaming services are available for this region.',
+                    actionLabel: 'Refresh',
+                    onAction: _loadOptions,
+                  )
+                else
+                  ..._options!.providers.map(
+                    (provider) => Card(
+                      margin: const EdgeInsets.only(bottom: 10),
+                      child: ListTile(
+                        leading: CircleAvatar(
+                          backgroundColor: const Color(0xFF2A2340),
+                          child: Text(
+                            provider.name.isEmpty
+                                ? '?'
+                                : provider.name.characters.first.toUpperCase(),
+                            style: const TextStyle(fontWeight: FontWeight.w900),
+                          ),
+                        ),
+                        title: Text(provider.name),
+                        subtitle: Text(_providerSubtitle(provider)),
+                        trailing: const Icon(Icons.open_in_new_rounded),
+                        onTap: () => _openProvider(provider),
+                      ),
+                    ),
+                  ),
+                if (_options?.attribution.isNotEmpty ?? false) ...[
+                  const SizedBox(height: 8),
                   Text(
-                    _options!.verified
-                        ? 'Streaming availability supplied by Watchmode.'
-                        : 'No provider is claimed until verified data is available.',
+                    _options!.attribution,
                     style: const TextStyle(
                       color: Color(0xFF77717F),
                       fontSize: 12,
@@ -781,6 +954,45 @@ class _ShowDetailPageState extends State<ShowDetailPage> {
                 ],
               ],
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AvailabilityMessage extends StatelessWidget {
+  const _AvailabilityMessage({
+    required this.icon,
+    required this.message,
+    required this.actionLabel,
+    required this.onAction,
+  });
+
+  final IconData icon;
+  final String message;
+  final String actionLabel;
+  final VoidCallback onAction;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: const Color(0xFF15111D),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFF2B2633)),
+      ),
+      child: Column(
+        children: [
+          Icon(icon, size: 34, color: const Color(0xFF9893A3)),
+          const SizedBox(height: 10),
+          Text(message, textAlign: TextAlign.center),
+          const SizedBox(height: 12),
+          TextButton.icon(
+            onPressed: onAction,
+            icon: const Icon(Icons.refresh_rounded),
+            label: Text(actionLabel),
           ),
         ],
       ),

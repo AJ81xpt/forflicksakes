@@ -14,7 +14,7 @@ class ApiService {
 
   final http.Client _client;
 
-  Future<List<ShowItem>> recommend({
+  Future<RecommendationResult> recommend({
     required String query,
     required String mood,
   }) async {
@@ -30,12 +30,9 @@ class ApiService {
       throw Exception('Recommendation service returned ${response.statusCode}.');
     }
 
-    final decoded = jsonDecode(response.body) as Map<String, dynamic>;
-    final results = decoded['results'] as List<dynamic>? ?? const <dynamic>[];
-    return results
-        .whereType<Map<String, dynamic>>()
-        .map(ShowItem.fromJson)
-        .toList();
+    return RecommendationResult.fromJson(
+      jsonDecode(response.body) as Map<String, dynamic>,
+    );
   }
 
   Future<WatchOptions> watchOptions({
