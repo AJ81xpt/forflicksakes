@@ -20,11 +20,11 @@ class ForFlickSakesApp extends StatelessWidget {
       theme: ThemeData(
         useMaterial3: true,
         brightness: Brightness.dark,
-        scaffoldBackgroundColor: const Color(0xFF07070C),
+        scaffoldBackgroundColor: const Color(0xFF050309),
         colorScheme: const ColorScheme.dark(
-          primary: Color(0xFF8574FF),
-          secondary: Color(0xFF4FD5CB),
-          surface: Color(0xFF13101B),
+          primary: Color(0xFF8125E8),
+          secondary: Color(0xFFB34CFF),
+          surface: Color(0xFF1B0733),
         ),
         textTheme: const TextTheme(
           headlineLarge: TextStyle(
@@ -264,7 +264,7 @@ class _DiscoverPageState extends State<DiscoverPage> {
       context: context,
       showDragHandle: true,
       isScrollControlled: true,
-      backgroundColor: const Color(0xFF15111D),
+      backgroundColor: const Color(0xFF0E0716),
       builder: (sheetContext) => SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(20, 4, 20, 28),
@@ -272,37 +272,60 @@ class _DiscoverPageState extends State<DiscoverPage> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                'Browse by mood',
-                style: Theme.of(sheetContext).textTheme.headlineSmall,
-              ),
+              Text('Browse by mood', style: Theme.of(sheetContext).textTheme.headlineSmall),
               const SizedBox(height: 8),
-              const Text(
-                'Mood browsing is separate from your written request, so the two can never conflict.',
-              ),
+              const Text('Choose the feeling first. Your written request is not used in this mode.'),
               const SizedBox(height: 18),
-              ...moods.map(
-                (mood) => Card(
-                  margin: const EdgeInsets.only(bottom: 10),
-                  clipBehavior: Clip.antiAlias,
-                  child: ListTile(
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 18,
-                      vertical: 10,
-                    ),
-                    leading: CircleAvatar(
-                      backgroundColor: const Color(0xFF30274A),
-                      child: Icon(mood.icon, color: const Color(0xFFC8BFFF)),
-                    ),
-                    title: Text(
-                      mood.title,
-                      style: const TextStyle(fontWeight: FontWeight.w800),
-                    ),
-                    subtitle: Text(mood.subtitle),
-                    trailing: const Icon(Icons.arrow_forward_rounded),
-                    onTap: _loading ? null : () => _browseMood(mood),
-                  ),
+              GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: moods.length,
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  crossAxisSpacing: 12,
+                  mainAxisSpacing: 12,
+                  childAspectRatio: 1.22,
                 ),
+                itemBuilder: (context, index) {
+                  final mood = moods[index];
+                  return InkWell(
+                    borderRadius: BorderRadius.circular(22),
+                    onTap: _loading ? null : () => _browseMood(mood),
+                    child: Ink(
+                      padding: const EdgeInsets.all(17),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(22),
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            const Color(0xFF2B0B51),
+                            index.isEven ? const Color(0xFF160927) : const Color(0xFF25093B),
+                          ],
+                        ),
+                        border: Border.all(color: const Color(0xFF8125E8).withValues(alpha: 0.55)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            width: 42,
+                            height: 42,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF8125E8).withValues(alpha: 0.22),
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            child: Icon(mood.icon, color: const Color(0xFFD7B8FF)),
+                          ),
+                          const Spacer(),
+                          Text(mood.title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
+                          const SizedBox(height: 4),
+                          Text(mood.subtitle, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, color: Color(0xFFB8AFC2), height: 1.25)),
+                        ],
+                      ),
+                    ),
+                  );
+                },
               ),
             ],
           ),
@@ -449,7 +472,7 @@ class _DiscoverPageState extends State<DiscoverPage> {
                   child: FilledButton.icon(
                     onPressed: _loading ? null : _findFromPrompt,
                     style: FilledButton.styleFrom(
-                      backgroundColor: const Color(0xFF8574FF),
+                      backgroundColor: const Color(0xFF8125E8),
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(21),
@@ -486,10 +509,10 @@ class _DiscoverPageState extends State<DiscoverPage> {
                 Container(
                   decoration: BoxDecoration(
                     gradient: const LinearGradient(
-                      colors: [Color(0xFF1F1940), Color(0xFF12352F)],
+                      colors: [Color(0xFF2B0B51), Color(0xFF160927)],
                     ),
                     borderRadius: BorderRadius.circular(22),
-                    border: Border.all(color: const Color(0xFF40365A)),
+                    border: Border.all(color: const Color(0xFF8125E8)),
                   ),
                   child: ListTile(
                     contentPadding: const EdgeInsets.symmetric(
@@ -497,8 +520,8 @@ class _DiscoverPageState extends State<DiscoverPage> {
                       vertical: 12,
                     ),
                     leading: const CircleAvatar(
-                      backgroundColor: Color(0xFF4FD5CB),
-                      child: Icon(Icons.theater_comedy_outlined, color: Color(0xFF091310)),
+                      backgroundColor: Color(0xFFB34CFF),
+                      child: Icon(Icons.theater_comedy_outlined, color: Color(0xFFF7F5FB)),
                     ),
                     title: const Text(
                       'Browse by mood',
@@ -512,8 +535,8 @@ class _DiscoverPageState extends State<DiscoverPage> {
                   ),
                 ),
                 if (_loading) ...[
-                  const SizedBox(height: 24),
-                  const LinearProgressIndicator(),
+                  const SizedBox(height: 26),
+                  const _ResultsSkeleton(),
                 ],
                 if (_interpretation.isNotEmpty) ...[
                   const SizedBox(height: 18),
@@ -623,6 +646,48 @@ class _DiscoverPageState extends State<DiscoverPage> {
   }
 }
 
+class _ResultsSkeleton extends StatelessWidget {
+  const _ResultsSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: List.generate(
+        3,
+        (index) => Container(
+          margin: const EdgeInsets.only(bottom: 14),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: const Color(0xFF12091B),
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: const Color(0xFF2A153A)),
+          ),
+          child: Row(
+            children: [
+              Container(width: 104, height: 150, decoration: BoxDecoration(color: const Color(0xFF24142F), borderRadius: BorderRadius.circular(16))),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(height: 19, width: double.infinity, decoration: BoxDecoration(color: const Color(0xFF291735), borderRadius: BorderRadius.circular(8))),
+                    const SizedBox(height: 12),
+                    Container(height: 13, width: 130, decoration: BoxDecoration(color: const Color(0xFF21132B), borderRadius: BorderRadius.circular(8))),
+                    const SizedBox(height: 20),
+                    Container(height: 12, width: double.infinity, decoration: BoxDecoration(color: const Color(0xFF21132B), borderRadius: BorderRadius.circular(8))),
+                    const SizedBox(height: 8),
+                    Container(height: 12, width: 180, decoration: BoxDecoration(color: const Color(0xFF21132B), borderRadius: BorderRadius.circular(8))),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _MoodOption {
   const _MoodOption({
     required this.keyName,
@@ -644,37 +709,37 @@ class _BrandHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Container(
-          width: 60,
-          height: 60,
-          decoration: BoxDecoration(
-            color: const Color(0xFF7C68F8),
-            borderRadius: BorderRadius.circular(18),
-          ),
-          child: const Icon(Icons.play_arrow_rounded, size: 34),
+        Image.asset(
+          'assets/brand/ffs_icon.png',
+          width: 58,
+          height: 58,
+          fit: BoxFit.contain,
         ),
-        const SizedBox(width: 16),
-        const Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+        const SizedBox(width: 14),
+        Expanded(
+          child: Image.asset(
+            'assets/brand/forflicksakes_logo_wide.png',
+            height: 44,
+            alignment: Alignment.centerLeft,
+            fit: BoxFit.contain,
+          ),
+        ),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+          decoration: BoxDecoration(
+            color: const Color(0xFF1B0733),
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(color: const Color(0xFF8125E8)),
+          ),
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Text(
-                'FORFLICKSAKES',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 2.1,
-                ),
-              ),
-              SizedBox(height: 3),
-              Text(
-                'Stop scrolling. Start watching.',
-                style: TextStyle(color: Color(0xFF908B99), fontSize: 15),
-              ),
+              Icon(Icons.cloud_done_outlined, size: 16, color: Color(0xFFD7B8FF)),
+              SizedBox(width: 5),
+              Text('LIVE', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, letterSpacing: 1.1)),
             ],
           ),
         ),
-        const Icon(Icons.cloud_done_outlined, color: Color(0xFF4FD5CB)),
       ],
     );
   }
@@ -686,55 +751,66 @@ class _ConciergePanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(28, 30, 28, 28),
+      padding: const EdgeInsets.fromLTRB(26, 28, 26, 26),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(32),
-        border: Border.all(color: const Color(0xFF3A3550)),
+        border: Border.all(color: const Color(0xFF8125E8).withValues(alpha: 0.65)),
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFF251D53), Color(0xFF111827), Color(0xFF0B362F)],
+          colors: [Color(0xFF2B0B51), Color(0xFF160927), Color(0xFF050309)],
         ),
+        boxShadow: const [
+          BoxShadow(color: Color(0x338125E8), blurRadius: 30, offset: Offset(0, 14)),
+        ],
       ),
-      child: const Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Stack(
         children: [
-          Row(
+          Positioned(
+            right: -28,
+            bottom: -28,
+            child: Opacity(
+              opacity: 0.11,
+              child: Image.asset('assets/brand/ffs_icon.png', width: 190, height: 190),
+            ),
+          ),
+          const Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(Icons.auto_awesome_rounded, color: Color(0xFFAFA4FF)),
-              SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  'YOUR PERSONAL WATCH CONCIERGE',
-                  style: TextStyle(
-                    color: Color(0xFFD1CBFF),
-                    fontSize: 13,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 1.65,
+              Row(
+                children: [
+                  Icon(Icons.auto_awesome_rounded, color: Color(0xFFD7B8FF)),
+                  SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'YOUR WATCH CONCIERGE',
+                      style: TextStyle(
+                        color: Color(0xFFD7B8FF),
+                        fontSize: 13,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 1.8,
+                      ),
+                    ),
                   ),
+                ],
+              ),
+              SizedBox(height: 25),
+              Text(
+                'Stop scrolling.\nStart watching.',
+                style: TextStyle(
+                  fontSize: 38,
+                  height: 1.08,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: -1.35,
+                  color: Color(0xFFF7F5FB),
                 ),
               ),
+              SizedBox(height: 18),
+              Text(
+                'Browse a mood for instant inspiration, or describe your perfect watch for precise, explainable picks.',
+                style: TextStyle(color: Color(0xFFC9BED5), fontSize: 16, height: 1.45),
+              ),
             ],
-          ),
-          SizedBox(height: 28),
-          Text(
-            'Your next\nobsession, picked\nin seconds.',
-            style: TextStyle(
-              fontSize: 37,
-              height: 1.15,
-              fontWeight: FontWeight.w900,
-              letterSpacing: -1.25,
-            ),
-          ),
-          SizedBox(height: 20),
-          Text(
-            'Describe exactly what you want, or browse by mood. Each path is '
-            'kept separate so conflicting instructions never dilute your picks.',
-            style: TextStyle(
-              color: Color(0xFFB6B0BE),
-              fontSize: 16,
-              height: 1.45,
-            ),
           ),
         ],
       ),
@@ -758,108 +834,115 @@ class ResultCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: const Color(0xFF15111D),
-      borderRadius: BorderRadius.circular(24),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(24),
-        onTap: () => Navigator.of(context).push(
-          MaterialPageRoute<void>(
-            builder: (_) => ShowDetailPage(
-              show: show,
-              region: region,
-              saved: saved,
-              onToggleSaved: onToggleSaved,
+    final reasons = show.matchReasons.take(3).toList();
+    return Hero(
+      tag: 'show-${show.id}',
+      child: Material(
+        color: const Color(0xFF100817),
+        borderRadius: BorderRadius.circular(26),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(26),
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => ShowDetailPage(show: show, region: region, saved: saved, onToggleSaved: onToggleSaved),
             ),
           ),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _Poster(url: show.poster, width: 128, height: 185),
-              const SizedBox(width: 18),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            show.title,
-                            style: const TextStyle(
-                              fontSize: 21,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                        ),
-                        IconButton(
-                          onPressed: onToggleSaved,
-                          icon: Icon(
-                            saved
-                                ? Icons.bookmark_rounded
-                                : Icons.bookmark_border_rounded,
-                          ),
-                        ),
-                      ],
-                    ),
-                    Text(
-                      [
+          child: Container(
+            padding: const EdgeInsets.all(15),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(26),
+              border: Border.all(color: const Color(0xFF2C153D)),
+              boxShadow: const [BoxShadow(color: Color(0x22000000), blurRadius: 18, offset: Offset(0, 10))],
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _Poster(url: show.poster, width: 120, height: 178),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(child: Text(show.title, style: const TextStyle(fontSize: 21, fontWeight: FontWeight.w900, height: 1.12))),
+                          IconButton(onPressed: onToggleSaved, visualDensity: VisualDensity.compact, icon: Icon(saved ? Icons.bookmark_rounded : Icons.bookmark_border_rounded)),
+                        ],
+                      ),
+                      const SizedBox(height: 5),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          if (show.confidence > 0)
+                            _MetaPill(icon: Icons.auto_awesome_rounded, label: '${show.confidence}% match', accent: true),
+                          if (show.rating > 0)
+                            _MetaPill(icon: Icons.star_rounded, label: '${show.rating}'),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      Text([
                         if (show.year > 0) '${show.year}',
                         if (show.seasons > 0) '${show.seasons} seasons',
                         if (show.runtime > 0) '${show.runtime} min',
-                        if (show.status.isNotEmpty) show.status,
-                      ].join(' · '),
-                      style: const TextStyle(color: Color(0xFF918B9B)),
-                    ),
-                    const SizedBox(height: 10),
-                    Row(
-                      children: [
-                        const Icon(
-                          Icons.star_rounded,
-                          color: Color(0xFFFFCA28),
-                          size: 21,
-                        ),
-                        const SizedBox(width: 5),
-                        Text(show.rating > 0 ? '${show.rating}' : 'Not rated'),
-                        const SizedBox(width: 13),
-                        const Text(
-                          'Live data',
-                          style: TextStyle(color: Color(0xFF4FD5CB)),
-                        ),
-                        if (show.confidence > 0) ...[
-                          const SizedBox(width: 10),
-                          Text(
-                            '${show.confidence}% match',
-                            style: const TextStyle(color: Color(0xFFAFA4FF)),
+                      ].join(' · '), style: const TextStyle(color: Color(0xFF9F94A8), fontSize: 13)),
+                      if (reasons.isNotEmpty) ...[
+                        const SizedBox(height: 13),
+                        const Text('WHY IT MATCHES', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 1.2, color: Color(0xFFD7B8FF))),
+                        const SizedBox(height: 7),
+                        for (final reason in reasons)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 4),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Icon(Icons.check_circle_rounded, size: 15, color: Color(0xFFB34CFF)),
+                                const SizedBox(width: 6),
+                                Expanded(child: Text(reason, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, color: Color(0xFFC5BBCB)))),
+                              ],
+                            ),
                           ),
-                        ],
+                      ] else ...[
+                        const SizedBox(height: 12),
+                        Text(show.summary, maxLines: 3, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFFAAA0B0), height: 1.4, fontSize: 13)),
                       ],
-                    ),
-                    const SizedBox(height: 14),
-                    Text(
-                      show.summary,
-                      maxLines: 3,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: Color(0xFFA9A3B1),
-                        height: 1.45,
+                      const SizedBox(height: 8),
+                      const Row(
+                        children: [
+                          Text('View details', style: TextStyle(color: Color(0xFFD7B8FF), fontWeight: FontWeight.w800)),
+                          SizedBox(width: 4),
+                          Icon(Icons.arrow_forward_rounded, size: 17, color: Color(0xFFD7B8FF)),
+                        ],
                       ),
-                    ),
-                    const SizedBox(height: 10),
-                    const Text(
-                      'Tap for details and viewing options',
-                      style: TextStyle(color: Color(0xFFB5AAFF), fontSize: 13),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
+    );
+  }
+}
+
+class _MetaPill extends StatelessWidget {
+  const _MetaPill({required this.icon, required this.label, this.accent = false});
+  final IconData icon;
+  final String label;
+  final bool accent;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
+      decoration: BoxDecoration(
+        color: accent ? const Color(0xFF8125E8).withValues(alpha: 0.20) : const Color(0xFF1B1023),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: accent ? const Color(0xFF8125E8) : const Color(0xFF33203E)),
+      ),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [Icon(icon, size: 14, color: accent ? const Color(0xFFD7B8FF) : const Color(0xFFFFCC5C)), const SizedBox(width: 4), Text(label, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800))]),
     );
   }
 }
