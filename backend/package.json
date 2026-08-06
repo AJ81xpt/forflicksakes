@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "start": "node server.js",
-    "check": "node --check server.js"
+    "check": "node --check server.js && node --check recommendation_engine.js",
+    "test": "node --test recommendation_engine.test.js"
   },
   "dependencies": {
     "cors": "^2.8.5",
