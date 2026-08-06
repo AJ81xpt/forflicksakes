@@ -3,328 +3,309 @@ const stripHtml = (value = '') => String(value)
   .replace(/\s+/g, ' ')
   .trim();
 
-const genericQueryWords = new Set([
-  'something', 'show', 'series', 'watch', 'watching', 'please', 'want', 'like',
-  'with', 'that', 'this', 'more', 'less', 'season', 'seasons', 'episode',
-  'episodes', 'popular', 'good', 'great', 'really', 'very', 'under', 'than',
-  'find', 'give', 'recommend', 'recommendation', 'tonight', 'kind', 'type',
-]);
+const GENRE_ALIASES = {
+  thriller: ['Thriller'],
+  suspense: ['Thriller'],
+  mystery: ['Mystery'],
+  detective: ['Mystery', 'Crime'],
+  crime: ['Crime'],
+  comedy: ['Comedy'],
+  funny: ['Comedy'],
+  sitcom: ['Comedy'],
+  romance: ['Romance'],
+  romantic: ['Romance'],
+  horror: ['Horror'],
+  scary: ['Horror'],
+  fantasy: ['Fantasy'],
+  action: ['Action'],
+  adventure: ['Adventure'],
+  drama: ['Drama'],
+  emotional: ['Drama'],
+  animation: ['Animation'],
+  animated: ['Animation'],
+  anime: ['Animation'],
+  family: ['Family'],
+  'sci-fi': ['Science-Fiction'],
+  scifi: ['Science-Fiction'],
+  'science fiction': ['Science-Fiction'],
+};
 
-export const moodProfiles = {
+const MOOD_PROFILES = {
   gripping: {
     label: 'Gripping',
-    requiredAnyGenres: ['Thriller', 'Crime', 'Mystery', 'Action', 'Adventure'],
-    positive: ['conspiracy', 'investigation', 'suspense', 'murder', 'secret', 'danger', 'missing', 'kidnap', 'spy', 'espionage', 'hunt', 'hostage', 'race against time'],
-    negative: ['reality', 'talk show', 'preschool', 'makeover', 'cooking competition'],
-    minimumEvidence: 2,
-  },
-  funny: {
-    label: 'Funny',
-    requiredAnyGenres: ['Comedy'],
-    positive: ['witty', 'funny', 'humour', 'humor', 'satire', 'awkward', 'friends', 'workplace', 'sitcom', 'comic'],
-    negative: ['serial killer', 'torture', 'war', 'bleak', 'disturbing'],
-    minimumEvidence: 1,
-  },
-  comforting: {
-    label: 'Comforting',
-    requiredAnyGenres: ['Comedy', 'Romance', 'Family'],
-    positive: ['friendship', 'community', 'heartwarming', 'small town', 'cooking', 'feel-good', 'kindness', 'home', 'warm', 'cozy', 'cosy', 'uplifting', 'gentle'],
-    negative: ['horror', 'serial killer', 'war', 'torture', 'apocalypse', 'bleak', 'disturbing', 'murder investigation'],
-    minimumEvidence: 2,
+    minScore: 8,
+    genres: { Thriller: 8, Crime: 6, Mystery: 7, Action: 4, Adventure: 2 },
+    themes: { suspense: 6, conspiracy: 5, investigation: 4, murder: 4, danger: 3, missing: 3, espionage: 5, hostage: 4, hunt: 3, secret: 2 },
+    penalties: { preschool: 12, reality: 8, 'talk show': 8 },
   },
   dark: {
     label: 'Dark',
-    requiredAnyGenres: ['Crime', 'Horror', 'Thriller', 'Mystery', 'Drama', 'Science-Fiction'],
-    positive: ['bleak', 'disturbing', 'psychological', 'murder', 'secret', 'dystopian', 'haunted', 'corruption', 'revenge', 'grim', 'noir', 'trauma'],
-    negative: ['preschool', 'light-hearted', 'feel-good', 'uplifting family comedy'],
-    minimumEvidence: 2,
+    minScore: 9,
+    genres: { Horror: 8, Thriller: 6, Crime: 5, Mystery: 4, Drama: 2 },
+    themes: { psychological: 6, bleak: 6, disturbing: 6, dystopian: 5, corruption: 4, revenge: 4, noir: 5, grim: 5, haunted: 5, murder: 3 },
+    penalties: { 'feel-good': 9, preschool: 12, uplifting: 6, wholesome: 6 },
+  },
+  funny: {
+    label: 'Funny',
+    minScore: 8,
+    genres: { Comedy: 10 },
+    themes: { witty: 5, funny: 5, satire: 5, sitcom: 6, awkward: 3, workplace: 3, comic: 4, humour: 4, humor: 4 },
+    penalties: { torture: 8, bleak: 6, 'serial killer': 8 },
+  },
+  comforting: {
+    label: 'Comforting',
+    minScore: 8,
+    genres: { Comedy: 5, Romance: 4, Family: 5 },
+    themes: { heartwarming: 7, friendship: 5, community: 5, 'small town': 4, cooking: 4, warm: 5, cozy: 6, cosy: 6, uplifting: 6, kindness: 5, home: 3, wholesome: 6 },
+    penalties: { horror: 12, torture: 12, apocalypse: 10, disturbing: 10, bleak: 9, 'serial killer': 12 },
   },
   clever: {
     label: 'Clever',
-    requiredAnyGenres: ['Mystery', 'Science-Fiction', 'Crime', 'Drama', 'Thriller'],
-    positive: ['puzzle', 'investigation', 'time', 'conspiracy', 'technology', 'strategy', 'genius', 'experiment', 'twist', 'mind', 'parallel', 'simulation'],
-    negative: ['reality', 'talk show', 'preschool'],
-    minimumEvidence: 2,
+    minScore: 8,
+    genres: { Mystery: 7, 'Science-Fiction': 6, Crime: 4, Thriller: 4, Drama: 2 },
+    themes: { puzzle: 7, twist: 6, investigation: 4, strategy: 6, genius: 5, experiment: 4, technology: 4, conspiracy: 3, 'time travel': 5, mind: 3 },
+    penalties: { preschool: 10, reality: 7, 'talk show': 7 },
   },
 };
 
-const genrePatterns = {
-  Comedy: /\b(comedy|sitcom|funny|witty|satire|comic|humou?r)\b/i,
-  Mystery: /\b(mystery|detective|puzzle|whodunnit|investigation|twists?)\b/i,
-  Crime: /\b(crime|criminal|police|murder|gangster|mafia|heist|corruption)\b/i,
-  Thriller: /\b(thriller|tense|suspense|gripping|conspiracy|espionage|hostage|kidnap)\b/i,
-  'Science-Fiction': /\b(sci[- ]?fi|science fiction|space|future|technology|dystopian|time travel|alien)\b/i,
-  Romance: /\b(romance|romantic|love story)\b/i,
-  Fantasy: /\b(fantasy|magic|mythical|witch|wizard|dragon)\b/i,
-  Horror: /\b(horror|scary|terrifying|haunted|demon|ghost)\b/i,
-  Animation: /\b(animated|animation|anime)\b/i,
-  Family: /\b(family friendly|for the family|kids|children|all ages)\b/i,
-  Drama: /\b(drama|dramatic|emotional)\b/i,
-  Action: /\b(action|fight|combat|mission|adventure)\b/i,
+const NEGATION_PATTERNS = [
+  ['Horror', /\b(?:no|not|without|avoid)\s+(?:any\s+|too\s+much\s+)?(?:horror|scary|gore)\b/i],
+  ['Comedy', /\b(?:no|not|without|avoid)\s+(?:any\s+)?(?:comedy|funny|sitcom)\b/i],
+  ['Romance', /\b(?:no|not|without|avoid)\s+(?:any\s+)?(?:romance|romantic)\b/i],
+  ['Animation', /\b(?:no|not|without|avoid)\s+(?:any\s+)?(?:animation|animated|anime)\b/i],
+  ['Reality', /\b(?:no|not|without|avoid)\s+(?:any\s+)?reality\b/i],
+];
+
+const THEME_RULES = {
+  twisty: /\b(?:twist|twists|unexpected|surprising|puzzle|mind[- ]bending)\b/i,
+  psychological: /\b(?:psychological|mind games?|identity|obsession|paranoia)\b/i,
+  slowBurn: /\b(?:slow[- ]burn|patient|atmospheric|meditative)\b/i,
+  fastPaced: /\b(?:fast[- ]paced|quick|propulsive|nonstop|high[- ]energy)\b/i,
+  light: /\b(?:light|lighter|feel[- ]good|uplifting|easy watch|comforting)\b/i,
+  dark: /\b(?:dark|bleak|grim|disturbing|unsettling)\b/i,
 };
-
-const excludedGenrePatterns = [
-  ['Horror', /(?:no|not|without|avoid)\s+(?:too\s+)?(?:much\s+)?horror|nothing scary|not scary/i],
-  ['Romance', /(?:no|not|without|avoid)\s+romance/i],
-  ['Comedy', /(?:no|not|without|avoid)\s+comedy|not funny/i],
-  ['Animation', /(?:no|not|without|avoid)\s+(?:animation|animated|anime)/i],
-  ['Reality', /(?:no|not|without|avoid)\s+reality/i],
-];
-
-const exclusionTermPatterns = [
-  ['dark', /not too dark|nothing bleak|not bleak/i],
-  ['violence', /(?:no|not|without|avoid)\s+(?:too\s+)?(?:much\s+)?violence|not violent/i],
-  ['slow', /not slow|fast paced|fast-paced/i],
-];
-
-export function queryTokens(query) {
-  return String(query || '')
-    .toLowerCase()
-    .replace(/[^a-z0-9\s-]/g, ' ')
-    .split(/\s+/)
-    .filter((word) => word.length > 2 && !genericQueryWords.has(word));
-}
 
 export function parsePrompt(query) {
   const raw = String(query || '').trim();
-  const text = raw.toLowerCase();
-  const intent = {
-    maxSeasons: null,
-    maxRuntime: null,
-    completedOnly: false,
-    requiredGenres: [],
-    excludedGenres: [],
-    excludedTerms: [],
-    preferredTerms: [],
-    referenceTitle: null,
-    referenceGenres: [],
-    referenceName: null,
-    labels: [],
-  };
+  const lower = raw.toLowerCase();
+  const requiredGenres = new Set();
+  const excludedGenres = new Set();
+  const themes = [];
+  const exclusions = [];
+  const labels = [];
 
-  const seasonMatch = text.match(/(?:no more than|up to|max(?:imum)?|under|less than)\s+(\d+)\s+seasons?/i);
-  if (seasonMatch) {
-    intent.maxSeasons = Number(seasonMatch[1]);
-    intent.labels.push(`Maximum ${seasonMatch[1]} seasons`);
+  for (const [genre, pattern] of NEGATION_PATTERNS) {
+    if (pattern.test(raw)) excludedGenres.add(genre);
   }
 
-  const runtimeMatch = text.match(/(?:under|less than|no more than|up to|max(?:imum)?)\s+(\d+)\s*(?:minutes?|mins?)/i);
-  if (runtimeMatch) {
-    intent.maxRuntime = Number(runtimeMatch[1]);
-    intent.labels.push(`Episodes up to ${runtimeMatch[1]} min`);
-  } else if (/short episodes?|quick watch|half[- ]hour/.test(text)) {
-    intent.maxRuntime = 35;
-    intent.labels.push('Short episodes');
-  }
-
-  if (/completed|finished series|complete story|already ended|no cliffhanger/.test(text)) {
-    intent.completedOnly = true;
-    intent.labels.push('Completed series');
-  }
-
-  for (const [genre, pattern] of Object.entries(genrePatterns)) {
-    if (pattern.test(raw)) intent.requiredGenres.push(genre);
-  }
-
-  for (const [genre, pattern] of excludedGenrePatterns) {
-    if (pattern.test(raw)) intent.excludedGenres.push(genre);
-  }
-
-  for (const [term, pattern] of exclusionTermPatterns) {
-    if (pattern.test(raw)) intent.excludedTerms.push(term);
-  }
-
-  intent.requiredGenres = [...new Set(intent.requiredGenres)]
-    .filter((genre) => !intent.excludedGenres.includes(genre));
-  intent.excludedGenres = [...new Set(intent.excludedGenres)];
-  intent.excludedTerms = [...new Set(intent.excludedTerms)];
-
-  const likeMatch = raw.match(/\blike\s+([^,.!?]+?)(?:\s+but\b|\s+with\b|\s+without\b|\s+and\b|$)/i);
-  if (likeMatch) {
-    const candidate = likeMatch[1].trim().replace(/^(the|a|an)\s+/i, '');
-    if (candidate.length >= 2 && candidate.length <= 60) {
-      intent.referenceTitle = candidate;
-      intent.labels.push(`Similar to ${candidate}`);
+  for (const [term, genres] of Object.entries(GENRE_ALIASES)) {
+    const pattern = new RegExp(`\\b${term.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&')}\\b`, 'i');
+    if (pattern.test(raw)) {
+      for (const genre of genres) {
+        if (!excludedGenres.has(genre)) requiredGenres.add(genre);
+      }
     }
   }
 
-  const tokens = queryTokens(raw);
-  intent.preferredTerms = tokens.filter((token) =>
-    !Object.keys(genrePatterns).some((genre) => genre.toLowerCase().includes(token)),
-  ).slice(0, 8);
+  const seasonMatch = lower.match(/(?:no more than|up to|max(?:imum)?|under|less than)\s+(\d+)\s+seasons?/i);
+  const runtimeMatch = lower.match(/(?:no more than|up to|max(?:imum)?|under|less than)\s+(\d+)\s*(?:minutes?|mins?)/i);
+  const referenceMatch = raw.match(/\b(?:like|similar to)\s+([^,.!?]+?)(?:\s+but\b|\s+without\b|\s+with\b|\s+and\b|$)/i);
 
-  if (intent.requiredGenres.length) {
-    intent.labels.push(`Required: ${intent.requiredGenres.join(' / ')}`);
+  const intent = {
+    raw,
+    maxSeasons: seasonMatch ? Number(seasonMatch[1]) : null,
+    maxRuntime: runtimeMatch ? Number(runtimeMatch[1]) : (/\b(?:half[- ]hour|short episodes?|quick watch)\b/i.test(raw) ? 35 : null),
+    completedOnly: /\b(?:completed|finished|ended|complete story|no cliffhanger)\b/i.test(raw),
+    requiredGenres: [...requiredGenres],
+    excludedGenres: [...excludedGenres],
+    themes,
+    exclusions,
+    referenceTitle: referenceMatch?.[1]?.trim() || null,
+    referenceGenres: [],
+    labels,
+  };
+
+  for (const [name, pattern] of Object.entries(THEME_RULES)) {
+    if (pattern.test(raw)) themes.push(name);
   }
-  if (intent.excludedGenres.length) {
-    intent.labels.push(`Exclude: ${intent.excludedGenres.join(' / ')}`);
-  }
-  if (intent.excludedTerms.length) {
-    intent.labels.push(`Avoid: ${intent.excludedTerms.join(', ')}`);
-  }
-  if (!intent.labels.length && raw) intent.labels.push('Natural-language request applied');
+
+  if (/\b(?:not too dark|nothing bleak|not bleak)\b/i.test(raw)) exclusions.push('dark');
+  if (/\b(?:no|not|without|avoid)\s+(?:too\s+much\s+)?(?:violence|violent|gore)\b/i.test(raw)) exclusions.push('violence');
+  if (/\b(?:not slow|avoid slow|fast[- ]paced)\b/i.test(raw)) exclusions.push('slow');
+
+  if (intent.requiredGenres.length) labels.push(`Required: ${intent.requiredGenres.join(' / ')}`);
+  if (intent.excludedGenres.length) labels.push(`Exclude: ${intent.excludedGenres.join(' / ')}`);
+  if (intent.maxSeasons) labels.push(`Maximum ${intent.maxSeasons} seasons`);
+  if (intent.maxRuntime) labels.push(`Episodes up to ${intent.maxRuntime} min`);
+  if (intent.completedOnly) labels.push('Completed series');
+  if (intent.referenceTitle) labels.push(`Similar to ${intent.referenceTitle}`);
+  if (intent.themes.length) labels.push(`Themes: ${intent.themes.join(', ')}`);
+  if (intent.exclusions.length) labels.push(`Avoid: ${intent.exclusions.join(', ')}`);
+  if (!labels.length) labels.push('Natural-language request applied');
 
   return intent;
 }
 
-export function showFacts(show) {
+export function showProfile(show) {
   const genres = Array.isArray(show?.genres) ? show.genres : [];
   const summary = stripHtml(show?.summary || '').toLowerCase();
   const title = String(show?.name || '').toLowerCase();
-  const haystack = `${title} ${summary} ${genres.join(' ').toLowerCase()}`;
-  const seasons = Number(show?._embedded?.seasons?.length || show?.seasonCount || 0);
+  const text = `${title} ${summary} ${genres.join(' ').toLowerCase()}`;
+  const seasons = Array.isArray(show?._embedded?.seasons) ? show._embedded.seasons.length : Number(show?.seasonCount || 0);
   const runtime = Number(show?.averageRuntime || show?.runtime || 0);
-  return { genres, summary, title, haystack, seasons, runtime };
+
+  const scoreWords = (words) => words.reduce((score, word) => score + (text.includes(word) ? 1 : 0), 0);
+  return {
+    genres,
+    summary,
+    title,
+    text,
+    seasons,
+    runtime,
+    status: String(show?.status || ''),
+    rating: Number(show?.rating?.average || 0),
+    popularity: Math.min(Number(show?.weight || 0), 100),
+    attributes: {
+      humour: Math.min(5, (genres.includes('Comedy') ? 3 : 0) + scoreWords(['funny', 'witty', 'satire', 'sitcom', 'comic'])),
+      darkness: Math.min(5, (genres.some((g) => ['Horror', 'Thriller', 'Crime'].includes(g)) ? 2 : 0) + scoreWords(['bleak', 'grim', 'disturbing', 'psychological', 'dystopian', 'murder'])),
+      complexity: Math.min(5, (genres.some((g) => ['Mystery', 'Science-Fiction'].includes(g)) ? 2 : 0) + scoreWords(['puzzle', 'twist', 'conspiracy', 'strategy', 'time travel', 'experiment'])),
+      comfort: Math.min(5, (genres.some((g) => ['Comedy', 'Romance', 'Family'].includes(g)) ? 2 : 0) + scoreWords(['heartwarming', 'friendship', 'community', 'warm', 'cozy', 'cosy', 'uplifting', 'kindness'])),
+      intensity: Math.min(5, (genres.some((g) => ['Thriller', 'Action', 'Crime'].includes(g)) ? 2 : 0) + scoreWords(['danger', 'suspense', 'hostage', 'hunt', 'war', 'murder'])),
+      pace: scoreWords(['fast-paced', 'nonstop', 'propulsive', 'race against time']) > 0 ? 5 : (scoreWords(['slow burn', 'meditative', 'patient']) > 0 ? 1 : 3),
+    },
+  };
 }
 
-export function semanticGenreMatch(facts, genre) {
-  const normalized = String(genre).toLowerCase();
-  if (facts.genres.some((item) => item.toLowerCase() === normalized)) return true;
-  const pattern = genrePatterns[genre];
-  return pattern ? pattern.test(facts.haystack) : facts.haystack.includes(normalized);
-}
-
-function violatesExcludedTerms(facts, terms) {
-  for (const term of terms || []) {
-    if (term === 'dark' && /bleak|disturbing|grim|dystopian|murder|horror|serial killer/.test(facts.haystack)) return true;
-    if (term === 'violence' && /violent|violence|war|murder|killer|combat|torture/.test(facts.haystack)) return true;
-    if (term === 'slow' && /slow burn|slow-paced|meditative/.test(facts.haystack)) return true;
-  }
-  return false;
+function genreMatches(profile, genre) {
+  const target = genre.toLowerCase();
+  if (profile.genres.some((g) => g.toLowerCase() === target)) return true;
+  const semantic = {
+    Thriller: /suspense|conspiracy|espionage|hostage|danger|psychological|serial killer|race against time/,
+    Mystery: /mystery|detective|investigation|missing|puzzle|whodunnit|twist/,
+    Crime: /crime|criminal|police|detective|murder|gang|mafia|heist|corruption/,
+    Comedy: /comedy|sitcom|funny|witty|satire|comic|humou?r/,
+    Romance: /romance|romantic|love story|relationship/,
+    Horror: /horror|haunted|demon|ghost|terrifying/,
+    'Science-Fiction': /science fiction|sci-fi|future|space|technology|dystopian|time travel|alien/,
+    Fantasy: /fantasy|magic|mythical|witch|wizard|dragon/,
+    Action: /action|combat|fight|mission|warrior/,
+    Adventure: /adventure|quest|expedition|journey/,
+    Drama: /drama|emotional|family conflict/,
+    Animation: /animated|animation|anime/,
+    Family: /family|children|kids|all ages/,
+  };
+  return semantic[genre]?.test(profile.text) || false;
 }
 
 export function auditPrompt(show, intent) {
-  const facts = showFacts(show);
-  const requiredMatches = intent.requiredGenres.filter((genre) => semanticGenreMatch(facts, genre));
-  const requiredMisses = intent.requiredGenres.filter((genre) => !semanticGenreMatch(facts, genre));
-  const failures = [];
+  const profile = showProfile(show);
+  const requiredMatches = intent.requiredGenres.filter((genre) => genreMatches(profile, genre));
+  const requiredMisses = intent.requiredGenres.filter((genre) => !genreMatches(profile, genre));
+  const excludedMatches = intent.excludedGenres.filter((genre) => genreMatches(profile, genre));
+  const violations = [];
 
-  if (requiredMisses.length) failures.push(`Missing required genre: ${requiredMisses.join(' / ')}`);
-  if (intent.maxSeasons && (!facts.seasons || facts.seasons > intent.maxSeasons)) failures.push('Season limit not met');
-  if (intent.maxRuntime && (!facts.runtime || facts.runtime > intent.maxRuntime)) failures.push('Runtime limit not met');
-  if (intent.completedOnly && show?.status !== 'Ended') failures.push('Series is not completed');
+  if (requiredMisses.length) violations.push(`Missing ${requiredMisses.join(' / ')}`);
+  if (excludedMatches.length) violations.push(`Contains excluded ${excludedMatches.join(' / ')}`);
+  if (intent.maxSeasons && (!profile.seasons || profile.seasons > intent.maxSeasons)) violations.push('Season limit');
+  if (intent.maxRuntime && (!profile.runtime || profile.runtime > intent.maxRuntime)) violations.push('Runtime limit');
+  if (intent.completedOnly && profile.status !== 'Ended') violations.push('Not completed');
+  if (intent.exclusions.includes('dark') && profile.attributes.darkness >= 4) violations.push('Too dark');
+  if (intent.exclusions.includes('violence') && /violence|violent|war|murder|killer|combat|torture|gore/.test(profile.text)) violations.push('Violence');
+  if (intent.exclusions.includes('slow') && profile.attributes.pace <= 2) violations.push('Too slow');
 
-  const excludedGenreHits = intent.excludedGenres.filter((genre) => semanticGenreMatch(facts, genre));
-  if (excludedGenreHits.length) failures.push(`Excluded genre present: ${excludedGenreHits.join(' / ')}`);
-  if (violatesExcludedTerms(facts, intent.excludedTerms)) failures.push('Excluded tone or theme present');
+  return { passed: violations.length === 0, violations, requiredMatches, profile };
+}
 
-  return {
-    passed: failures.length === 0,
-    failures,
-    requiredMatches,
-    requiredMisses,
-    facts,
-  };
+function themeScore(profile, themes) {
+  let score = 0;
+  for (const theme of themes) {
+    if (theme === 'twisty') score += profile.attributes.complexity * 2;
+    if (theme === 'psychological') score += profile.attributes.darkness + profile.attributes.complexity;
+    if (theme === 'slowBurn') score += profile.attributes.pace <= 2 ? 7 : -4;
+    if (theme === 'fastPaced') score += profile.attributes.pace >= 4 ? 7 : -5;
+    if (theme === 'light') score += profile.attributes.comfort * 2 - profile.attributes.darkness;
+    if (theme === 'dark') score += profile.attributes.darkness * 2;
+  }
+  return score;
 }
 
 export function scorePrompt(show, query, intent) {
   const audit = auditPrompt(show, intent);
-  if (!audit.passed) return { passed: false, score: -Infinity, confidence: 0, reasons: [], failures: audit.failures };
+  if (!audit.passed) return { passed: false, score: -999, reasons: [], audit };
+  const p = audit.profile;
+  let score = audit.requiredMatches.length * 30;
+  score += themeScore(p, intent.themes);
+  score += Math.min(p.rating, 10) * 1.2;
+  score += p.popularity / 40;
 
-  let score = 25;
-  const reasons = [];
+  if (intent.completedOnly) score += 8;
+  if (intent.maxSeasons && p.seasons <= intent.maxSeasons) score += 5;
+  if (intent.maxRuntime && p.runtime <= intent.maxRuntime) score += 5;
+  for (const genre of intent.referenceGenres || []) if (genreMatches(p, genre)) score += 6;
 
-  if (audit.requiredMatches.length) {
-    score += audit.requiredMatches.length * 22;
-    reasons.push(`Required match: ${audit.requiredMatches.join(' / ')}`);
+  const tokens = String(query || '').toLowerCase().match(/[a-z0-9-]{4,}/g) || [];
+  for (const token of tokens) {
+    if (p.title.includes(token)) score += 2;
+    else if (p.text.includes(token)) score += 0.6;
   }
-  if (intent.completedOnly) {
-    score += 8;
-    reasons.push('Completed series');
-  }
-  if (intent.maxSeasons && audit.facts.seasons) {
-    score += 6;
-    reasons.push(`Within limit: ${audit.facts.seasons} seasons`);
-  }
-  if (intent.maxRuntime && audit.facts.runtime) {
-    score += 6;
-    reasons.push(`Within limit: ${audit.facts.runtime}-minute episodes`);
-  }
-
-  let preferenceHits = 0;
-  for (const token of intent.preferredTerms || queryTokens(query)) {
-    if (audit.facts.title.includes(token)) {
-      score += 4;
-      preferenceHits += 1;
-    } else if (audit.facts.haystack.includes(token)) {
-      score += 2;
-      preferenceHits += 1;
-    }
-  }
-  if (preferenceHits) reasons.push(`${preferenceHits} request detail${preferenceHits === 1 ? '' : 's'} matched`);
-
-  const referenceMatches = (intent.referenceGenres || []).filter((genre) => semanticGenreMatch(audit.facts, genre));
-  if (referenceMatches.length) {
-    score += referenceMatches.length * 5;
-    reasons.push(`Shares ${referenceMatches.slice(0, 2).join(' / ')} themes with ${intent.referenceName || intent.referenceTitle}`);
-  }
-
-  const rating = Number(show?.rating?.average || 0);
-  if (rating) {
-    score += Math.min(rating, 10) * 1.2;
-    reasons.push(`Rated ${rating}/10`);
-  }
-  score += Math.min(Number(show?.weight || 0), 100) / 100;
   if (!show?.image?.medium && !show?.image?.original) score -= 15;
-  if (!show?.summary) score -= 6;
 
-  const confidence = Math.max(1, Math.min(99, Math.round(score)));
-  return { passed: true, score, confidence, reasons: reasons.slice(0, 5), failures: [] };
-}
+  const reasons = [];
+  if (audit.requiredMatches.length) reasons.push(`Required match: ${audit.requiredMatches.join(' / ')}`);
+  if (intent.completedOnly) reasons.push('Completed series');
+  if (intent.maxSeasons) reasons.push(`${p.seasons} seasons — within your limit`);
+  if (intent.maxRuntime) reasons.push(`${p.runtime}-minute episodes — within your limit`);
+  if (intent.referenceGenres?.length) reasons.push(`Shares genres with ${intent.referenceName || intent.referenceTitle}`);
+  if (intent.themes.includes('twisty') && p.attributes.complexity >= 3) reasons.push('Twisty, puzzle-led storytelling');
+  if (intent.themes.includes('light') && p.attributes.comfort >= 3) reasons.push('Lighter, more comforting tone');
+  if (p.rating) reasons.push(`Rated ${p.rating}/10`);
 
-function containsTerm(haystack, term) {
-  const escaped = String(term).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  return new RegExp(`(?:^|\\b)${escaped}(?:$|\\b)`, 'i').test(haystack);
+  return { passed: true, score, reasons: reasons.slice(0, 5), audit };
 }
 
 export function scoreMood(show, mood) {
-  const profile = moodProfiles[mood];
-  if (!profile) return { passed: false, score: -Infinity, confidence: 0, reasons: [] };
+  const profileDefinition = MOOD_PROFILES[mood];
+  if (!profileDefinition) return { passed: false, score: -999, reasons: [] };
+  const profile = showProfile(show);
+  let score = 0;
+  const evidence = [];
 
-  const facts = showFacts(show);
-  const genreMatches = profile.requiredAnyGenres.filter((genre) => semanticGenreMatch(facts, genre));
-  const positiveMatches = profile.positive.filter((word) => containsTerm(facts.haystack, word));
-  const negativeMatches = profile.negative.filter((word) => containsTerm(facts.haystack, word));
-  const evidence = genreMatches.length + positiveMatches.length;
+  for (const [genre, weight] of Object.entries(profileDefinition.genres)) {
+    if (genreMatches(profile, genre)) {
+      score += weight;
+      evidence.push(`${genre} tone`);
+    }
+  }
+  for (const [word, weight] of Object.entries(profileDefinition.themes)) {
+    if (profile.text.includes(word)) {
+      score += weight;
+      evidence.push(`${word} themes`);
+    }
+  }
+  for (const [word, penalty] of Object.entries(profileDefinition.penalties)) {
+    if (profile.text.includes(word)) score -= penalty;
+  }
 
-  const passed = genreMatches.length > 0
-    && evidence >= profile.minimumEvidence
-    && negativeMatches.length === 0;
-  if (!passed) return { passed: false, score: -Infinity, confidence: 0, reasons: [] };
+  if (mood === 'dark') score += profile.attributes.darkness * 1.8;
+  if (mood === 'funny') score += profile.attributes.humour * 2;
+  if (mood === 'comforting') score += profile.attributes.comfort * 2 - profile.attributes.darkness;
+  if (mood === 'clever') score += profile.attributes.complexity * 2;
+  if (mood === 'gripping') score += profile.attributes.intensity * 2;
 
-  let score = 30 + genreMatches.length * 12 + positiveMatches.length * 5;
-  const rating = Number(show?.rating?.average || 0);
-  score += rating * 1.1;
-  score += Math.min(Number(show?.weight || 0), 100) / 100;
-  if (!show?.image?.medium && !show?.image?.original) score -= 15;
-
-  const reasons = [
-    `Mood: ${profile.label}`,
-    ...genreMatches.slice(0, 2).map((genre) => `${genre} tone`),
-    ...positiveMatches.slice(0, 2).map((word) => `${word} themes`),
-  ];
-  if (rating) reasons.push(`Rated ${rating}/10`);
-
+  score += profile.rating * 0.7 + profile.popularity / 60;
+  const passed = score >= profileDefinition.minScore && evidence.length > 0;
   return {
-    passed: true,
+    passed,
     score,
-    confidence: Math.max(1, Math.min(99, Math.round(score))),
-    reasons: reasons.slice(0, 5),
+    reasons: [`Mood: ${profileDefinition.label}`, ...evidence.slice(0, 3), profile.rating ? `Rated ${profile.rating}/10` : null].filter(Boolean),
+    profile,
   };
 }
 
-export function rankPromptShows(shows, query, intent, limit = 12) {
-  return shows
-    .map((show) => ({ show, evaluation: scorePrompt(show, query, intent) }))
-    .filter((item) => item.evaluation.passed)
-    .sort((a, b) => b.evaluation.score - a.evaluation.score)
-    .slice(0, limit);
+export function moodLabel(mood) {
+  return MOOD_PROFILES[mood]?.label || null;
 }
 
-export function rankMoodShows(shows, mood, limit = 12) {
-  return shows
-    .map((show) => ({ show, evaluation: scoreMood(show, mood) }))
-    .filter((item) => item.evaluation.passed)
-    .sort((a, b) => b.evaluation.score - a.evaluation.score)
-    .slice(0, limit);
+export function knownMoods() {
+  return Object.keys(MOOD_PROFILES);
 }
