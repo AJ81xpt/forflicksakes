@@ -52,6 +52,11 @@ class AppShell extends StatefulWidget {
 class _AppShellState extends State<AppShell> {
   int _index = 0;
   final Set<String> _saved = <String>{};
+  final Set<String> _providers = <String>{'Netflix', 'Prime Video', 'Max', 'Showmax'};
+  String _country = 'ZA';
+  int _maxSeasons = 3;
+  bool _completedOnly = false;
+  bool _analyticsEnabled = false;
 
   void _toggleSaved(String title) {
     setState(() {
@@ -64,7 +69,22 @@ class _AppShellState extends State<AppShell> {
     final pages = <Widget>[
       DiscoverPage(saved: _saved, onToggleSaved: _toggleSaved),
       WatchlistPage(saved: _saved, onToggleSaved: _toggleSaved),
-      const ProfilePage(),
+      ProfilePage(
+        providers: _providers,
+        country: _country,
+        maxSeasons: _maxSeasons,
+        completedOnly: _completedOnly,
+        analyticsEnabled: _analyticsEnabled,
+        onProviderChanged: (provider, enabled) {
+          setState(() {
+            enabled ? _providers.add(provider) : _providers.remove(provider);
+          });
+        },
+        onCountryChanged: (country) => setState(() => _country = country),
+        onMaxSeasonsChanged: (value) => setState(() => _maxSeasons = value),
+        onCompletedOnlyChanged: (value) => setState(() => _completedOnly = value),
+        onAnalyticsChanged: (value) => setState(() => _analyticsEnabled = value),
+      ),
     ];
 
     return Scaffold(
@@ -538,7 +558,53 @@ class WatchlistPage extends StatelessWidget {
 }
 
 class ProfilePage extends StatelessWidget {
-  const ProfilePage({super.key});
+  const ProfilePage({
+    required this.providers,
+    required this.country,
+    required this.maxSeasons,
+    required this.completedOnly,
+    required this.analyticsEnabled,
+    required this.onProviderChanged,
+    required this.onCountryChanged,
+    required this.onMaxSeasonsChanged,
+    required this.onCompletedOnlyChanged,
+    required this.onAnalyticsChanged,
+    super.key,
+  });
+
+  final Set<String> providers;
+  final String country;
+  final int maxSeasons;
+  final bool completedOnly;
+  final bool analyticsEnabled;
+  final void Function(String provider, bool enabled) onProviderChanged;
+  final ValueChanged<String> onCountryChanged;
+  final ValueChanged<int> onMaxSeasonsChanged;
+  final ValueChanged<bool> onCompletedOnlyChanged;
+  final ValueChanged<bool> onAnalyticsChanged;
+
+  static const _providerOptions = <String>[
+    'Netflix',
+    'Prime Video',
+    'Apple TV+',
+    'Disney+',
+    'Max',
+    'Showmax',
+    'DStv Stream',
+  ];
+
+  static const _countries = <String, String>{
+    'ZA': 'South Africa',
+    'PT': 'Portugal',
+    'GB': 'United Kingdom',
+    'US': 'United States',
+    'IE': 'Ireland',
+    'ES': 'Spain',
+    'FR': 'France',
+    'DE': 'Germany',
+    'AU': 'Australia',
+    'NZ': 'New Zealand',
+  };
 
   @override
   Widget build(BuildContext context) {
@@ -546,29 +612,90 @@ class ProfilePage extends StatelessWidget {
       child: ListView(
         padding: const EdgeInsets.fromLTRB(24, 28, 24, 110),
         children: [
-          Text('Profile', style: Theme.of(context).textTheme.headlineLarge),
+          Text('Profile & preferences', style: Theme.of(context).textTheme.headlineLarge),
           const SizedBox(height: 24),
           const ListTile(
             tileColor: Color(0xFF15111D),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(20))),
             leading: CircleAvatar(child: Icon(Icons.person_rounded)),
             title: Text('Guest profile'),
-            subtitle: Text('Sign-in and cloud sync come next'),
+            subtitle: Text('Your local preferences are active'),
           ),
-          const SizedBox(height: 16),
-          const ListTile(
-            leading: Icon(Icons.public_rounded),
-            title: Text('Region'),
-            subtitle: Text('South Africa'),
+          const SizedBox(height: 28),
+          Text('Streaming services', style: Theme.of(context).textTheme.titleLarge),
+          const SizedBox(height: 8),
+          const Text(
+            'Only recommend titles available on services you use.',
+            style: TextStyle(color: Color(0xFF9893A3), height: 1.4),
+          ),
+          const SizedBox(height: 12),
+          ..._providerOptions.map(
+            (provider) => SwitchListTile.adaptive(
+              contentPadding: EdgeInsets.zero,
+              title: Text(provider),
+              value: providers.contains(provider),
+              onChanged: (enabled) => onProviderChanged(provider, enabled),
+            ),
+          ),
+          const Divider(height: 36),
+          DropdownButtonFormField<String>(
+            initialValue: country,
+            decoration: InputDecoration(
+              labelText: 'Streaming country',
+              prefixIcon: const Icon(Icons.public_rounded),
+              filled: true,
+              fillColor: const Color(0xFF15111D),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(18)),
+            ),
+            items: _countries.entries
+                .map((entry) => DropdownMenuItem(value: entry.key, child: Text(entry.value)))
+                .toList(),
+            onChanged: (value) {
+              if (value != null) onCountryChanged(value);
+            },
+          ),
+          const SizedBox(height: 28),
+          Text('Maximum seasons: $maxSeasons', style: Theme.of(context).textTheme.titleLarge),
+          Slider(
+            value: maxSeasons.toDouble(),
+            min: 1,
+            max: 10,
+            divisions: 9,
+            label: '$maxSeasons',
+            onChanged: (value) => onMaxSeasonsChanged(value.round()),
+          ),
+          SwitchListTile.adaptive(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Completed shows only'),
+            subtitle: const Text('Hide shows that are still ongoing.'),
+            value: completedOnly,
+            onChanged: onCompletedOnlyChanged,
+          ),
+          const Divider(height: 36),
+          SwitchListTile.adaptive(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Help improve ForFlickSakes'),
+            subtitle: const Text('Share anonymous usage and performance information.'),
+            value: analyticsEnabled,
+            onChanged: onAnalyticsChanged,
           ),
           const ListTile(
-            leading: Icon(Icons.tv_rounded),
-            title: Text('Streaming services'),
-            subtitle: Text('Netflix, Max, Showmax, Prime Video'),
+            contentPadding: EdgeInsets.zero,
+            leading: Icon(Icons.privacy_tip_outlined),
+            title: Text('Privacy policy'),
+            trailing: Icon(Icons.chevron_right),
           ),
           const ListTile(
-            leading: Icon(Icons.shield_outlined),
-            title: Text('Privacy and legal'),
+            contentPadding: EdgeInsets.zero,
+            leading: Icon(Icons.description_outlined),
+            title: Text('Terms of service'),
+            trailing: Icon(Icons.chevron_right),
+          ),
+          const ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: Icon(Icons.info_outline_rounded),
+            title: Text('About ForFlickSakes'),
+            trailing: Icon(Icons.chevron_right),
           ),
         ],
       ),
