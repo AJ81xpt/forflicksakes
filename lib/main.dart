@@ -21,17 +21,8 @@ class ForFlickSakesApp extends StatelessWidget {
         ),
         fontFamily: 'Roboto',
         textTheme: const TextTheme(
-          headlineLarge: TextStyle(
-            fontSize: 38,
-            height: 1.16,
-            fontWeight: FontWeight.w800,
-            letterSpacing: -1.2,
-          ),
-          headlineSmall: TextStyle(
-            fontSize: 25,
-            fontWeight: FontWeight.w800,
-            letterSpacing: -0.5,
-          ),
+          headlineLarge: TextStyle(fontSize: 38, height: 1.16, fontWeight: FontWeight.w800, letterSpacing: -1.2),
+          headlineSmall: TextStyle(fontSize: 25, fontWeight: FontWeight.w800, letterSpacing: -0.5),
           titleLarge: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
           bodyLarge: TextStyle(fontSize: 17, height: 1.45, color: Color(0xFFB7B2C0)),
           bodyMedium: TextStyle(fontSize: 15, height: 1.45, color: Color(0xFF9893A3)),
@@ -52,11 +43,6 @@ class AppShell extends StatefulWidget {
 class _AppShellState extends State<AppShell> {
   int _index = 0;
   final Set<String> _saved = <String>{};
-  final Set<String> _providers = <String>{'Netflix', 'Prime Video', 'Max', 'Showmax'};
-  String _country = 'ZA';
-  int _maxSeasons = 3;
-  bool _completedOnly = false;
-  bool _analyticsEnabled = false;
 
   void _toggleSaved(String title) {
     setState(() {
@@ -69,22 +55,7 @@ class _AppShellState extends State<AppShell> {
     final pages = <Widget>[
       DiscoverPage(saved: _saved, onToggleSaved: _toggleSaved),
       WatchlistPage(saved: _saved, onToggleSaved: _toggleSaved),
-      ProfilePage(
-        providers: _providers,
-        country: _country,
-        maxSeasons: _maxSeasons,
-        completedOnly: _completedOnly,
-        analyticsEnabled: _analyticsEnabled,
-        onProviderChanged: (provider, enabled) {
-          setState(() {
-            enabled ? _providers.add(provider) : _providers.remove(provider);
-          });
-        },
-        onCountryChanged: (country) => setState(() => _country = country),
-        onMaxSeasonsChanged: (value) => setState(() => _maxSeasons = value),
-        onCompletedOnlyChanged: (value) => setState(() => _completedOnly = value),
-        onAnalyticsChanged: (value) => setState(() => _analyticsEnabled = value),
-      ),
+      const ProfilePage(),
     ];
 
     return Scaffold(
@@ -104,21 +75,9 @@ class _AppShellState extends State<AppShell> {
             onDestinationSelected: (value) => setState(() => _index = value),
             labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
             destinations: const [
-              NavigationDestination(
-                icon: Icon(Icons.auto_awesome_outlined),
-                selectedIcon: Icon(Icons.auto_awesome_rounded),
-                label: 'Discover',
-              ),
-              NavigationDestination(
-                icon: Icon(Icons.bookmark_border_rounded),
-                selectedIcon: Icon(Icons.bookmark_rounded),
-                label: 'Watchlist',
-              ),
-              NavigationDestination(
-                icon: Icon(Icons.person_outline_rounded),
-                selectedIcon: Icon(Icons.person_rounded),
-                label: 'Profile',
-              ),
+              NavigationDestination(icon: Icon(Icons.auto_awesome_outlined), selectedIcon: Icon(Icons.auto_awesome_rounded), label: 'Discover'),
+              NavigationDestination(icon: Icon(Icons.bookmark_border_rounded), selectedIcon: Icon(Icons.bookmark_rounded), label: 'Watchlist'),
+              NavigationDestination(icon: Icon(Icons.person_outline_rounded), selectedIcon: Icon(Icons.person_rounded), label: 'Profile'),
             ],
           ),
         ),
@@ -138,13 +97,11 @@ class DiscoverPage extends StatefulWidget {
 }
 
 class _DiscoverPageState extends State<DiscoverPage> {
-  final _controller = TextEditingController(
-    text: 'Something gripping and clever, no more than 3 seasons',
-  );
+  final _controller = TextEditingController(text: 'Something gripping and clever, no more than 3 seasons');
   String _mood = 'Funny';
   bool _showResults = false;
 
-  static const moods = ['Gripping', 'Funny', 'Comforting', 'Dark', 'Clever'];
+  static const moods = <String>['Gripping', 'Funny', 'Comforting', 'Dark', 'Clever'];
 
   @override
   void dispose() {
@@ -161,7 +118,7 @@ class _DiscoverPageState extends State<DiscoverPage> {
             padding: const EdgeInsets.fromLTRB(24, 22, 24, 118),
             sliver: SliverList.list(
               children: [
-                _BrandHeader(onMute: () {}),
+                const _BrandHeader(),
                 const SizedBox(height: 36),
                 const _ConciergePanel(),
                 const SizedBox(height: 28),
@@ -179,18 +136,9 @@ class _DiscoverPageState extends State<DiscoverPage> {
                     filled: true,
                     fillColor: const Color(0xFF15111D),
                     contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 22),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(27),
-                      borderSide: const BorderSide(color: Color(0xFF2B2633)),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(27),
-                      borderSide: const BorderSide(color: Color(0xFF2B2633)),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(27),
-                      borderSide: const BorderSide(color: Color(0xFF8574FF), width: 1.5),
-                    ),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(27), borderSide: const BorderSide(color: Color(0xFF2B2633))),
+                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(27), borderSide: const BorderSide(color: Color(0xFF2B2633))),
+                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(27), borderSide: const BorderSide(color: Color(0xFF8574FF), width: 1.5)),
                   ),
                 ),
                 const SizedBox(height: 22),
@@ -214,14 +162,8 @@ class _DiscoverPageState extends State<DiscoverPage> {
                       showCheckmark: false,
                       selectedColor: const Color(0xFF4FD5CB),
                       backgroundColor: const Color(0xFF0F0C15),
-                      side: BorderSide(
-                        color: selected ? const Color(0xFF4FD5CB) : const Color(0xFFE4E0E8),
-                        width: 1.4,
-                      ),
-                      labelStyle: TextStyle(
-                        color: selected ? const Color(0xFF091310) : Colors.white,
-                        fontSize: 16,
-                      ),
+                      side: BorderSide(color: selected ? const Color(0xFF4FD5CB) : const Color(0xFFE4E0E8), width: 1.4),
+                      labelStyle: TextStyle(color: selected ? const Color(0xFF091310) : Colors.white, fontSize: 16),
                       padding: const EdgeInsets.symmetric(horizontal: 17, vertical: 12),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       onSelected: (_) => setState(() => _mood = mood),
@@ -249,20 +191,18 @@ class _DiscoverPageState extends State<DiscoverPage> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text('Curated for you', style: Theme.of(context).textTheme.headlineSmall),
-                      Text('5 picks', style: Theme.of(context).textTheme.bodyLarge),
+                      Text('${demoShows.length} picks', style: Theme.of(context).textTheme.bodyLarge),
                     ],
                   ),
                   const SizedBox(height: 18),
-                  ...demoShows.map(
-                    (show) => Padding(
-                      padding: const EdgeInsets.only(bottom: 16),
-                      child: ResultCard(
-                        show: show,
-                        saved: widget.saved.contains(show.title),
-                        onToggleSaved: () => widget.onToggleSaved(show.title),
-                      ),
-                    ),
-                  ),
+                  ...demoShows.map((show) => Padding(
+                        padding: const EdgeInsets.only(bottom: 16),
+                        child: ResultCard(
+                          show: show,
+                          saved: widget.saved.contains(show.title),
+                          onToggleSaved: () => widget.onToggleSaved(show.title),
+                        ),
+                      )),
                 ],
               ],
             ),
@@ -274,8 +214,7 @@ class _DiscoverPageState extends State<DiscoverPage> {
 }
 
 class _BrandHeader extends StatelessWidget {
-  const _BrandHeader({required this.onMute});
-  final VoidCallback onMute;
+  const _BrandHeader();
 
   @override
   Widget build(BuildContext context) {
@@ -284,10 +223,7 @@ class _BrandHeader extends StatelessWidget {
         Container(
           width: 60,
           height: 60,
-          decoration: BoxDecoration(
-            color: const Color(0xFF7C68F8),
-            borderRadius: BorderRadius.circular(18),
-          ),
+          decoration: BoxDecoration(color: const Color(0xFF7C68F8), borderRadius: BorderRadius.circular(18)),
           child: const Icon(Icons.play_arrow_rounded, size: 34, color: Colors.white),
         ),
         const SizedBox(width: 16),
@@ -295,22 +231,16 @@ class _BrandHeader extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                'FORFLICKSAKES',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, letterSpacing: 2.1),
-              ),
+              Text('FORFLICKSAKES', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, letterSpacing: 2.1)),
               SizedBox(height: 3),
-              Text(
-                'Stop scrolling. Start watching.',
-                style: TextStyle(color: Color(0xFF908B99), fontSize: 15),
-              ),
+              Text('Stop scrolling. Start watching.', style: TextStyle(color: Color(0xFF908B99), fontSize: 15)),
             ],
           ),
         ),
         IconButton(
-          tooltip: 'Mute notifications',
-          onPressed: onMute,
-          icon: const Icon(Icons.notifications_off_outlined, color: Color(0xFF8E8998)),
+          tooltip: 'Notifications',
+          onPressed: () {},
+          icon: const Icon(Icons.notifications_none_rounded, color: Color(0xFF8E8998)),
         ),
       ],
     );
@@ -327,11 +257,7 @@ class _ConciergePanel extends StatelessWidget {
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(32),
         border: Border.all(color: const Color(0xFF3A3550)),
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFF251D53), Color(0xFF111827), Color(0xFF0B362F)],
-        ),
+        gradient: const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFF251D53), Color(0xFF111827), Color(0xFF0B362F)]),
       ),
       child: const Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -341,28 +267,12 @@ class _ConciergePanel extends StatelessWidget {
               Icon(Icons.auto_awesome_rounded, color: Color(0xFFAFA4FF), size: 24),
               SizedBox(width: 10),
               Expanded(
-                child: Text(
-                  'YOUR PERSONAL WATCH CONCIERGE',
-                  style: TextStyle(
-                    color: Color(0xFFD1CBFF),
-                    fontSize: 13,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 1.65,
-                  ),
-                ),
+                child: Text('YOUR PERSONAL WATCH CONCIERGE', style: TextStyle(color: Color(0xFFD1CBFF), fontSize: 13, fontWeight: FontWeight.w900, letterSpacing: 1.65)),
               ),
             ],
           ),
           SizedBox(height: 28),
-          Text(
-            'Your next\nobsession, picked\nin seconds.',
-            style: TextStyle(
-              fontSize: 37,
-              height: 1.15,
-              fontWeight: FontWeight.w900,
-              letterSpacing: -1.25,
-            ),
-          ),
+          Text('Your next\nobsession, picked\nin seconds.', style: TextStyle(fontSize: 37, height: 1.15, fontWeight: FontWeight.w900, letterSpacing: -1.25)),
           SizedBox(height: 20),
           Text(
             'Tell ForFlickSakes your mood, available time and streaming services. You get a few confident choices—not another endless catalogue.',
@@ -375,12 +285,7 @@ class _ConciergePanel extends StatelessWidget {
 }
 
 class ResultCard extends StatelessWidget {
-  const ResultCard({
-    required this.show,
-    required this.saved,
-    required this.onToggleSaved,
-    super.key,
-  });
+  const ResultCard({required this.show, required this.saved, required this.onToggleSaved, super.key});
 
   final DemoShow show;
   final bool saved;
@@ -391,21 +296,21 @@ class ResultCard extends StatelessWidget {
       context: context,
       showDragHandle: true,
       backgroundColor: const Color(0xFF15111D),
-      builder: (context) => SafeArea(
+      builder: (sheetContext) => SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(24, 6, 24, 30),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Where to watch', style: Theme.of(context).textTheme.headlineSmall),
+              Text('Where to watch', style: Theme.of(sheetContext).textTheme.headlineSmall),
               const SizedBox(height: 10),
               Text('${show.title} is currently listed on ${show.provider}.'),
               const SizedBox(height: 22),
               SizedBox(
                 width: double.infinity,
                 child: FilledButton.icon(
-                  onPressed: () => Navigator.pop(context),
+                  onPressed: () => Navigator.pop(sheetContext),
                   icon: const Icon(Icons.play_arrow_rounded),
                   label: Text('Watch on ${show.provider}'),
                 ),
@@ -417,6 +322,14 @@ class ResultCard extends StatelessWidget {
     );
   }
 
+  void _showDetails(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => ShowDetailPage(show: show, saved: saved, onToggleSaved: onToggleSaved),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Material(
@@ -424,7 +337,7 @@ class ResultCard extends StatelessWidget {
       borderRadius: BorderRadius.circular(24),
       child: InkWell(
         borderRadius: BorderRadius.circular(24),
-        onTap: () => _showWatchOptions(context),
+        onTap: () => _showDetails(context),
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Row(
@@ -438,7 +351,7 @@ class ResultCard extends StatelessWidget {
                   child: Image.network(
                     show.poster,
                     fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Container(
+                    errorBuilder: (context, error, stackTrace) => Container(
                       color: const Color(0xFF2A2532),
                       alignment: Alignment.center,
                       child: const Icon(Icons.movie_outlined, size: 42),
@@ -453,12 +366,7 @@ class ResultCard extends StatelessWidget {
                   children: [
                     Row(
                       children: [
-                        Expanded(
-                          child: Text(
-                            show.title,
-                            style: const TextStyle(fontSize: 21, fontWeight: FontWeight.w800),
-                          ),
-                        ),
+                        Expanded(child: Text(show.title, style: const TextStyle(fontSize: 21, fontWeight: FontWeight.w800))),
                         IconButton(
                           tooltip: saved ? 'Remove from watchlist' : 'Save to watchlist',
                           visualDensity: VisualDensity.compact,
@@ -467,10 +375,7 @@ class ResultCard extends StatelessWidget {
                         ),
                       ],
                     ),
-                    Text(
-                      '${show.year} · ${show.seasons} seasons · ${show.runtime} min',
-                      style: const TextStyle(color: Color(0xFF918B9B), fontSize: 14),
-                    ),
+                    Text('${show.year} · ${show.seasons} seasons · ${show.runtime} min', style: const TextStyle(color: Color(0xFF918B9B), fontSize: 14)),
                     const SizedBox(height: 10),
                     Row(
                       children: [
@@ -478,22 +383,11 @@ class ResultCard extends StatelessWidget {
                         const SizedBox(width: 5),
                         Text('${show.rating}', style: const TextStyle(fontSize: 15)),
                         const SizedBox(width: 13),
-                        Flexible(
-                          child: Text(
-                            show.provider,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(color: Color(0xFF655A8E), fontSize: 15),
-                          ),
-                        ),
+                        Flexible(child: Text(show.provider, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFFB5AAFF), fontSize: 15))),
                       ],
                     ),
                     const SizedBox(height: 14),
-                    Text(
-                      show.reason,
-                      maxLines: 3,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(color: Color(0xFFA9A3B1), fontSize: 15, height: 1.45),
-                    ),
+                    Text(show.reason, maxLines: 3, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFFA9A3B1), fontSize: 15, height: 1.45)),
                     const SizedBox(height: 14),
                     TextButton.icon(
                       onPressed: () => _showWatchOptions(context),
@@ -511,8 +405,151 @@ class ResultCard extends StatelessWidget {
   }
 }
 
+class ShowDetailPage extends StatelessWidget {
+  const ShowDetailPage({required this.show, required this.saved, required this.onToggleSaved, super.key});
+
+  final DemoShow show;
+  final bool saved;
+  final VoidCallback onToggleSaved;
+
+  void _showWatchOptions(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      backgroundColor: const Color(0xFF15111D),
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 6, 24, 30),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Where to watch', style: Theme.of(sheetContext).textTheme.headlineSmall),
+              const SizedBox(height: 10),
+              Text('${show.title} is currently listed on ${show.provider}.'),
+              const SizedBox(height: 22),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  onPressed: () => Navigator.pop(sheetContext),
+                  icon: const Icon(Icons.play_arrow_rounded),
+                  label: Text('Watch on ${show.provider}'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFF07070C),
+      body: CustomScrollView(
+        slivers: [
+          SliverAppBar(
+            pinned: true,
+            expandedHeight: 430,
+            backgroundColor: const Color(0xFF07070C),
+            foregroundColor: Colors.white,
+            actions: [
+              IconButton(
+                tooltip: saved ? 'Remove from watchlist' : 'Save to watchlist',
+                onPressed: onToggleSaved,
+                icon: Icon(saved ? Icons.bookmark_rounded : Icons.bookmark_border_rounded),
+              ),
+            ],
+            flexibleSpace: FlexibleSpaceBar(
+              background: Stack(
+                fit: StackFit.expand,
+                children: [
+                  Image.network(
+                    show.poster,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) => Container(
+                      color: const Color(0xFF211C29),
+                      alignment: Alignment.center,
+                      child: const Icon(Icons.movie_outlined, size: 72),
+                    ),
+                  ),
+                  const DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [Colors.transparent, Color(0x5507070C), Color(0xFF07070C)],
+                        stops: [0.38, 0.70, 1],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(24, 8, 24, 44),
+            sliver: SliverList.list(
+              children: [
+                Text(show.title, style: const TextStyle(fontSize: 34, height: 1.1, fontWeight: FontWeight.w900, letterSpacing: -0.8)),
+                const SizedBox(height: 12),
+                Text('${show.year} · ${show.seasons} seasons · ${show.runtime} min', style: const TextStyle(color: Color(0xFF9B95A4), fontSize: 15)),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    const Icon(Icons.star_rounded, color: Color(0xFFFFCA28), size: 22),
+                    const SizedBox(width: 6),
+                    Text('${show.rating}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                    const SizedBox(width: 18),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF211B2C),
+                        borderRadius: BorderRadius.circular(999),
+                        border: Border.all(color: const Color(0xFF3A3346)),
+                      ),
+                      child: Text(show.provider, style: const TextStyle(color: Color(0xFFC2B9FF), fontWeight: FontWeight.w700)),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 28),
+                Text('Why we picked this', style: Theme.of(context).textTheme.titleLarge),
+                const SizedBox(height: 10),
+                Text(show.reason, style: const TextStyle(color: Color(0xFFB8B2C0), fontSize: 16, height: 1.55)),
+                const SizedBox(height: 30),
+                SizedBox(
+                  height: 58,
+                  child: FilledButton.icon(
+                    onPressed: () => _showWatchOptions(context),
+                    icon: const Icon(Icons.play_arrow_rounded),
+                    label: Text('Watch on ${show.provider}'),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFF8574FF),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                      textStyle: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                OutlinedButton.icon(
+                  onPressed: onToggleSaved,
+                  icon: Icon(saved ? Icons.bookmark_rounded : Icons.bookmark_border_rounded),
+                  label: Text(saved ? 'Saved to watchlist' : 'Save to watchlist'),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class WatchlistPage extends StatelessWidget {
   const WatchlistPage({required this.saved, required this.onToggleSaved, super.key});
+
   final Set<String> saved;
   final ValueChanged<String> onToggleSaved;
 
@@ -530,23 +567,15 @@ class WatchlistPage extends StatelessWidget {
             const Text('The picks you want to come back to.'),
             const SizedBox(height: 24),
             if (shows.isEmpty)
-              const Expanded(
-                child: Center(
-                  child: Text('Save a recommendation and it will appear here.'),
-                ),
-              )
+              const Expanded(child: Center(child: Text('Save a recommendation and it will appear here.')))
             else
               Expanded(
                 child: ListView.separated(
                   itemCount: shows.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 16),
+                  separatorBuilder: (context, index) => const SizedBox(height: 16),
                   itemBuilder: (context, index) {
                     final show = shows[index];
-                    return ResultCard(
-                      show: show,
-                      saved: true,
-                      onToggleSaved: () => onToggleSaved(show.title),
-                    );
+                    return ResultCard(show: show, saved: true, onToggleSaved: () => onToggleSaved(show.title));
                   },
                 ),
               ),
@@ -557,43 +586,17 @@ class WatchlistPage extends StatelessWidget {
   }
 }
 
-class ProfilePage extends StatelessWidget {
-  const ProfilePage({
-    required this.providers,
-    required this.country,
-    required this.maxSeasons,
-    required this.completedOnly,
-    required this.analyticsEnabled,
-    required this.onProviderChanged,
-    required this.onCountryChanged,
-    required this.onMaxSeasonsChanged,
-    required this.onCompletedOnlyChanged,
-    required this.onAnalyticsChanged,
-    super.key,
-  });
+class ProfilePage extends StatefulWidget {
+  const ProfilePage({super.key});
 
-  final Set<String> providers;
-  final String country;
-  final int maxSeasons;
-  final bool completedOnly;
-  final bool analyticsEnabled;
-  final void Function(String provider, bool enabled) onProviderChanged;
-  final ValueChanged<String> onCountryChanged;
-  final ValueChanged<int> onMaxSeasonsChanged;
-  final ValueChanged<bool> onCompletedOnlyChanged;
-  final ValueChanged<bool> onAnalyticsChanged;
+  @override
+  State<ProfilePage> createState() => _ProfilePageState();
+}
 
-  static const _providerOptions = <String>[
-    'Netflix',
-    'Prime Video',
-    'Apple TV+',
-    'Disney+',
-    'Max',
-    'Showmax',
-    'DStv Stream',
-  ];
+class _ProfilePageState extends State<ProfilePage> {
+  static const services = <String>['Netflix', 'Prime Video', 'Apple TV+', 'Disney+', 'Max', 'Showmax', 'DStv Stream'];
 
-  static const _countries = <String, String>{
+  static const regions = <String, String>{
     'ZA': 'South Africa',
     'PT': 'Portugal',
     'GB': 'United Kingdom',
@@ -606,96 +609,171 @@ class ProfilePage extends StatelessWidget {
     'NZ': 'New Zealand',
   };
 
+  final Set<String> _selectedServices = <String>{'Netflix', 'Prime Video', 'Max', 'Showmax'};
+  String _region = 'ZA';
+  double _maximumSeasons = 3;
+  bool _completedOnly = false;
+  bool _analyticsEnabled = false;
+
+  void _toggleService(String service) {
+    setState(() {
+      if (!_selectedServices.add(service)) _selectedServices.remove(service);
+    });
+  }
+
+  void _showInfo(BuildContext context, String title, String body) {
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      backgroundColor: const Color(0xFF15111D),
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 4, 24, 32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title, style: Theme.of(sheetContext).textTheme.headlineSmall),
+              const SizedBox(height: 14),
+              Text(body, style: const TextStyle(color: Color(0xFFB7B2C0), fontSize: 15, height: 1.5)),
+              const SizedBox(height: 24),
+              SizedBox(width: double.infinity, child: FilledButton(onPressed: () => Navigator.pop(sheetContext), child: const Text('Close'))),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final maxSeasons = _maximumSeasons.round();
     return SafeArea(
       child: ListView(
         padding: const EdgeInsets.fromLTRB(24, 28, 24, 110),
         children: [
-          Text('Profile & preferences', style: Theme.of(context).textTheme.headlineLarge),
-          const SizedBox(height: 24),
-          const ListTile(
-            tileColor: Color(0xFF15111D),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(20))),
-            leading: CircleAvatar(child: Icon(Icons.person_rounded)),
-            title: Text('Guest profile'),
-            subtitle: Text('Your local preferences are active'),
-          ),
-          const SizedBox(height: 28),
-          Text('Streaming services', style: Theme.of(context).textTheme.titleLarge),
+          Text('Profile', style: Theme.of(context).textTheme.headlineLarge),
           const SizedBox(height: 8),
-          const Text(
-            'Only recommend titles available on services you use.',
-            style: TextStyle(color: Color(0xFF9893A3), height: 1.4),
-          ),
-          const SizedBox(height: 12),
-          ..._providerOptions.map(
-            (provider) => SwitchListTile.adaptive(
-              contentPadding: EdgeInsets.zero,
-              title: Text(provider),
-              value: providers.contains(provider),
-              onChanged: (enabled) => onProviderChanged(provider, enabled),
+          const Text('Shape recommendations around your services and viewing habits.'),
+          const SizedBox(height: 24),
+          Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(color: const Color(0xFF15111D), borderRadius: BorderRadius.circular(22), border: Border.all(color: const Color(0xFF282230))),
+            child: const Row(
+              children: [
+                CircleAvatar(radius: 26, backgroundColor: Color(0xFF352A82), child: Icon(Icons.person_rounded, color: Colors.white)),
+                SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Guest profile', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+                      SizedBox(height: 4),
+                      Text('Cloud sync and sign-in will be added next.', style: TextStyle(color: Color(0xFF9893A3))),
+                    ],
+                  ),
+                ),
+              ],
             ),
           ),
-          const Divider(height: 36),
+          const SizedBox(height: 30),
+          Text('Streaming region', style: Theme.of(context).textTheme.titleLarge),
+          const SizedBox(height: 12),
           DropdownButtonFormField<String>(
-            initialValue: country,
+            initialValue: _region,
             decoration: InputDecoration(
-              labelText: 'Streaming country',
-              prefixIcon: const Icon(Icons.public_rounded),
               filled: true,
               fillColor: const Color(0xFF15111D),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(18)),
+              prefixIcon: const Icon(Icons.public_rounded),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(18), borderSide: const BorderSide(color: Color(0xFF2B2633))),
+              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(18), borderSide: const BorderSide(color: Color(0xFF2B2633))),
             ),
-            items: _countries.entries
-                .map((entry) => DropdownMenuItem(value: entry.key, child: Text(entry.value)))
-                .toList(),
+            items: regions.entries.map((entry) => DropdownMenuItem<String>(value: entry.key, child: Text(entry.value))).toList(),
             onChanged: (value) {
-              if (value != null) onCountryChanged(value);
+              if (value != null) setState(() => _region = value);
             },
           ),
-          const SizedBox(height: 28),
-          Text('Maximum seasons: $maxSeasons', style: Theme.of(context).textTheme.titleLarge),
+          const SizedBox(height: 30),
+          Text('Streaming services', style: Theme.of(context).textTheme.titleLarge),
+          const SizedBox(height: 8),
+          const Text('Select every service you currently use.'),
+          const SizedBox(height: 16),
+          Wrap(
+            spacing: 10,
+            runSpacing: 12,
+            children: services.map((service) {
+              final selected = _selectedServices.contains(service);
+              return FilterChip(
+                selected: selected,
+                showCheckmark: false,
+                avatar: selected
+                    ? const Icon(Icons.check_rounded, size: 18, color: Color(0xFF091310))
+                    : const Icon(Icons.tv_rounded, size: 18),
+                label: Text(service),
+                selectedColor: const Color(0xFF4FD5CB),
+                backgroundColor: const Color(0xFF15111D),
+                side: BorderSide(color: selected ? const Color(0xFF4FD5CB) : const Color(0xFF39333F)),
+                labelStyle: TextStyle(color: selected ? const Color(0xFF091310) : Colors.white, fontWeight: FontWeight.w600),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                onSelected: (_) => _toggleService(service),
+              );
+            }).toList(),
+          ),
+          const SizedBox(height: 30),
+          Row(
+            children: [
+              Expanded(child: Text('Maximum seasons: $maxSeasons', style: Theme.of(context).textTheme.titleLarge)),
+              Text(maxSeasons == 10 ? 'Any' : '$maxSeasons', style: const TextStyle(color: Color(0xFFAFA4FF), fontSize: 17, fontWeight: FontWeight.w800)),
+            ],
+          ),
           Slider(
-            value: maxSeasons.toDouble(),
+            value: _maximumSeasons,
             min: 1,
             max: 10,
             divisions: 9,
-            label: '$maxSeasons',
-            onChanged: (value) => onMaxSeasonsChanged(value.round()),
+            label: maxSeasons == 10 ? 'Any' : '$maxSeasons seasons',
+            onChanged: (value) => setState(() => _maximumSeasons = value),
           ),
-          SwitchListTile.adaptive(
-            contentPadding: EdgeInsets.zero,
+          const SizedBox(height: 10),
+          SwitchListTile(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+            value: _completedOnly,
             title: const Text('Completed shows only'),
-            subtitle: const Text('Hide shows that are still ongoing.'),
-            value: completedOnly,
-            onChanged: onCompletedOnlyChanged,
+            subtitle: const Text('Avoid programmes still waiting for future seasons.'),
+            secondary: const Icon(Icons.flag_circle_outlined),
+            onChanged: (value) => setState(() => _completedOnly = value),
           ),
-          const Divider(height: 36),
-          SwitchListTile.adaptive(
-            contentPadding: EdgeInsets.zero,
+          const Divider(height: 38, color: Color(0xFF282230)),
+          SwitchListTile(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+            value: _analyticsEnabled,
             title: const Text('Help improve ForFlickSakes'),
-            subtitle: const Text('Share anonymous usage and performance information.'),
-            value: analyticsEnabled,
-            onChanged: onAnalyticsChanged,
+            subtitle: const Text('Allow anonymous performance and usage analytics.'),
+            secondary: const Icon(Icons.analytics_outlined),
+            onChanged: (value) => setState(() => _analyticsEnabled = value),
           ),
-          const ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: Icon(Icons.privacy_tip_outlined),
-            title: Text('Privacy policy'),
-            trailing: Icon(Icons.chevron_right),
+          const SizedBox(height: 12),
+          ListTile(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+            leading: const Icon(Icons.shield_outlined),
+            title: const Text('Privacy policy'),
+            trailing: const Icon(Icons.chevron_right_rounded),
+            onTap: () => _showInfo(context, 'Privacy policy', 'ForFlickSakes stores your selected services, region and recommendation preferences to personalise the app. Account and cloud features will include controls for accessing and deleting your information.'),
           ),
-          const ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: Icon(Icons.description_outlined),
-            title: Text('Terms of service'),
-            trailing: Icon(Icons.chevron_right),
+          ListTile(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+            leading: const Icon(Icons.description_outlined),
+            title: const Text('Terms of service'),
+            trailing: const Icon(Icons.chevron_right_rounded),
+            onTap: () => _showInfo(context, 'Terms of service', 'ForFlickSakes provides entertainment discovery and recommendations. Streaming availability can change and should be confirmed with the relevant provider.'),
           ),
-          const ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: Icon(Icons.info_outline_rounded),
-            title: Text('About ForFlickSakes'),
-            trailing: Icon(Icons.chevron_right),
+          ListTile(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+            leading: const Icon(Icons.info_outline_rounded),
+            title: const Text('About ForFlickSakes'),
+            subtitle: const Text('Stop scrolling. Start watching.'),
+            trailing: const Icon(Icons.chevron_right_rounded),
+            onTap: () => _showInfo(context, 'About ForFlickSakes', 'ForFlickSakes helps you find a confident next watch based on your mood, available time, preferred length and streaming services.'),
           ),
         ],
       ),
@@ -704,16 +782,7 @@ class ProfilePage extends StatelessWidget {
 }
 
 class DemoShow {
-  const DemoShow({
-    required this.title,
-    required this.year,
-    required this.seasons,
-    required this.runtime,
-    required this.rating,
-    required this.provider,
-    required this.poster,
-    required this.reason,
-  });
+  const DemoShow({required this.title, required this.year, required this.seasons, required this.runtime, required this.rating, required this.provider, required this.poster, required this.reason});
 
   final String title;
   final int year;
