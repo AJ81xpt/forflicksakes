@@ -146,53 +146,165 @@ class DiscoverPage extends StatefulWidget {
 
 class _DiscoverPageState extends State<DiscoverPage> {
   final ApiService _api = ApiService();
-  final TextEditingController _controller = TextEditingController(
-    text: 'Something gripping and clever, no more than 3 seasons',
-  );
+  final TextEditingController _controller = TextEditingController();
 
-  String _mood = 'Funny';
   bool _loading = false;
   String? _error;
+  String? _activeMood;
+  String _resultMode = 'prompt';
   List<ShowItem> _results = const <ShowItem>[];
   List<String> _interpretation = const <String>[];
 
-  static const moods = <String>[
-    'Gripping',
-    'Funny',
-    'Comforting',
-    'Dark',
-    'Clever',
+  static const moods = <_MoodOption>[
+    _MoodOption(
+      keyName: 'gripping',
+      title: 'Gripping',
+      subtitle: 'Tension, mysteries and cliffhangers',
+      icon: Icons.local_fire_department_outlined,
+    ),
+    _MoodOption(
+      keyName: 'dark',
+      title: 'Dark',
+      subtitle: 'Psychological, bleak and unsettling',
+      icon: Icons.dark_mode_outlined,
+    ),
+    _MoodOption(
+      keyName: 'funny',
+      title: 'Funny',
+      subtitle: 'Comedy-first picks that make you laugh',
+      icon: Icons.sentiment_very_satisfied_outlined,
+    ),
+    _MoodOption(
+      keyName: 'comforting',
+      title: 'Comforting',
+      subtitle: 'Warm, uplifting and easy to settle into',
+      icon: Icons.weekend_outlined,
+    ),
+    _MoodOption(
+      keyName: 'clever',
+      title: 'Clever',
+      subtitle: 'Puzzles, twists and intricate stories',
+      icon: Icons.psychology_outlined,
+    ),
   ];
 
-  Future<void> _curate() async {
+  Future<void> _findFromPrompt() async {
+    final query = _controller.text.trim();
+    if (query.length < 3) {
+      setState(() => _error = 'Describe the kind of show you want first.');
+      return;
+    }
+
     FocusScope.of(context).unfocus();
     setState(() {
       _loading = true;
       _error = null;
+      _activeMood = null;
+      _resultMode = 'prompt';
       _interpretation = const <String>[];
     });
 
     try {
-      final recommendation = await _api.recommend(
-        query: _controller.text.trim(),
-        mood: _mood,
-      );
+      final recommendation = await _api.recommendFromPrompt(query: query);
       if (!mounted) return;
       setState(() {
         _results = recommendation.shows;
         _interpretation = recommendation.interpretation;
         _loading = false;
-        if (recommendation.shows.isEmpty) {
-          _error = 'No strong matches were found. Try a broader request.';
+        if (_results.isEmpty) {
+          _error = 'No titles passed every requirement. Try relaxing one constraint.';
         }
       });
-    } catch (_) {
+    } catch (error) {
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _error = 'The live catalogue could not be reached. Is the backend running?';
+        _error = error.toString().replaceFirst('Exception: ', '');
       });
     }
+  }
+
+  Future<void> _browseMood(_MoodOption mood) async {
+    Navigator.of(context).pop();
+    FocusScope.of(context).unfocus();
+    setState(() {
+      _loading = true;
+      _error = null;
+      _activeMood = mood.title;
+      _resultMode = 'mood';
+      _interpretation = <String>['Mood: ${mood.title}'];
+    });
+
+    try {
+      final recommendation = await _api.recommendFromMood(mood: mood.keyName);
+      if (!mounted) return;
+      setState(() {
+        _results = recommendation.shows;
+        _interpretation = recommendation.interpretation;
+        _loading = false;
+        if (_results.isEmpty) {
+          _error = 'No strong ${mood.title.toLowerCase()} matches were found.';
+        }
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = error.toString().replaceFirst('Exception: ', '');
+      });
+    }
+  }
+
+  void _openMoodBrowser() {
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      backgroundColor: const Color(0xFF15111D),
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 4, 20, 28),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Browse by mood',
+                style: Theme.of(sheetContext).textTheme.headlineSmall,
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Mood browsing is separate from your written request, so the two can never conflict.',
+              ),
+              const SizedBox(height: 18),
+              ...moods.map(
+                (mood) => Card(
+                  margin: const EdgeInsets.only(bottom: 10),
+                  clipBehavior: Clip.antiAlias,
+                  child: ListTile(
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 18,
+                      vertical: 10,
+                    ),
+                    leading: CircleAvatar(
+                      backgroundColor: const Color(0xFF30274A),
+                      child: Icon(mood.icon, color: const Color(0xFFC8BFFF)),
+                    ),
+                    title: Text(
+                      mood.title,
+                      style: const TextStyle(fontWeight: FontWeight.w800),
+                    ),
+                    subtitle: Text(mood.subtitle),
+                    trailing: const Icon(Icons.arrow_forward_rounded),
+                    onTap: _loading ? null : () => _browseMood(mood),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   @override
@@ -214,17 +326,24 @@ class _DiscoverPageState extends State<DiscoverPage> {
                 const SizedBox(height: 36),
                 const _ConciergePanel(),
                 const SizedBox(height: 28),
+                Text(
+                  'Describe your perfect watch',
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+                const SizedBox(height: 10),
                 TextField(
                   controller: _controller,
-                  minLines: 2,
-                  maxLines: 3,
+                  minLines: 3,
+                  maxLines: 5,
+                  textInputAction: TextInputAction.done,
+                  onSubmitted: (_) => _loading ? null : _findFromPrompt(),
                   style: const TextStyle(fontSize: 17, height: 1.45),
                   decoration: InputDecoration(
                     prefixIcon: const Padding(
-                      padding: EdgeInsets.only(left: 15, right: 8, bottom: 25),
+                      padding: EdgeInsets.only(left: 15, right: 8, bottom: 48),
                       child: Icon(Icons.chat_bubble_outline_rounded, size: 27),
                     ),
-                    hintText: 'Tell us what you feel like watching',
+                    hintText: 'A completed psychological thriller under 3 seasons with clever twists',
                     filled: true,
                     fillColor: const Color(0xFF15111D),
                     contentPadding: const EdgeInsets.symmetric(
@@ -252,7 +371,7 @@ class _DiscoverPageState extends State<DiscoverPage> {
                 const Padding(
                   padding: EdgeInsets.symmetric(horizontal: 4),
                   child: Text(
-                    'Try: “A completed mystery like Severance, under 45 minutes, not too dark.”',
+                    'Try a genre, maximum seasons, episode length, completed status, exclusions, or “something like…”',
                     style: TextStyle(
                       color: Color(0xFF827C8C),
                       fontSize: 13,
@@ -260,79 +379,78 @@ class _DiscoverPageState extends State<DiscoverPage> {
                     ),
                   ),
                 ),
-                const SizedBox(height: 18),
-                Wrap(
-                  spacing: 10,
-                  runSpacing: 14,
-                  children: moods.map((mood) {
-                    final selected = mood == _mood;
-                    return ChoiceChip(
-                      selected: selected,
-                      showCheckmark: false,
-                      selectedColor: const Color(0xFF4FD5CB),
-                      backgroundColor: const Color(0xFF0F0C15),
-                      side: BorderSide(
-                        color: selected
-                            ? const Color(0xFF4FD5CB)
-                            : const Color(0xFFE4E0E8),
-                        width: 1.4,
-                      ),
-                      label: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          if (selected) ...[
-                            const Icon(
-                              Icons.check_rounded,
-                              size: 19,
-                              color: Color(0xFF091310),
-                            ),
-                            const SizedBox(width: 8),
-                          ],
-                          Text(mood),
-                        ],
-                      ),
-                      labelStyle: TextStyle(
-                        color: selected
-                            ? const Color(0xFF091310)
-                            : Colors.white,
-                        fontSize: 16,
-                      ),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 17,
-                        vertical: 12,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      onSelected: (_) => setState(() => _mood = mood),
-                    );
-                  }).toList(),
-                ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 20),
                 SizedBox(
-                  height: 65,
+                  height: 62,
                   child: FilledButton.icon(
-                    onPressed: _loading ? null : _curate,
+                    onPressed: _loading ? null : _findFromPrompt,
                     style: FilledButton.styleFrom(
                       backgroundColor: const Color(0xFF8574FF),
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(23),
+                        borderRadius: BorderRadius.circular(21),
                       ),
                       textStyle: const TextStyle(
-                        fontSize: 19,
+                        fontSize: 18,
                         fontWeight: FontWeight.w800,
                       ),
                     ),
-                    icon: _loading
+                    icon: _loading && _resultMode == 'prompt'
                         ? const SizedBox.square(
                             dimension: 22,
                             child: CircularProgressIndicator(strokeWidth: 2.5),
                           )
                         : const Icon(Icons.auto_awesome_rounded),
-                    label: Text(_loading ? 'Finding live picks…' : 'Curate my picks'),
+                    label: const Text('Find my picks'),
                   ),
                 ),
+                const SizedBox(height: 18),
+                Row(
+                  children: [
+                    const Expanded(child: Divider(color: Color(0xFF2A2532))),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 14),
+                      child: Text(
+                        'OR',
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                    ),
+                    const Expanded(child: Divider(color: Color(0xFF2A2532))),
+                  ],
+                ),
+                const SizedBox(height: 18),
+                Container(
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF1F1940), Color(0xFF12352F)],
+                    ),
+                    borderRadius: BorderRadius.circular(22),
+                    border: Border.all(color: const Color(0xFF40365A)),
+                  ),
+                  child: ListTile(
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 12,
+                    ),
+                    leading: const CircleAvatar(
+                      backgroundColor: Color(0xFF4FD5CB),
+                      child: Icon(Icons.theater_comedy_outlined, color: Color(0xFF091310)),
+                    ),
+                    title: const Text(
+                      'Browse by mood',
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
+                    ),
+                    subtitle: const Text(
+                      'Gripping, dark, funny, comforting or clever',
+                    ),
+                    trailing: const Icon(Icons.arrow_forward_rounded),
+                    onTap: _loading ? null : _openMoodBrowser,
+                  ),
+                ),
+                if (_loading) ...[
+                  const SizedBox(height: 24),
+                  const LinearProgressIndicator(),
+                ],
                 if (_interpretation.isNotEmpty) ...[
                   const SizedBox(height: 18),
                   Container(
@@ -346,17 +464,21 @@ class _DiscoverPageState extends State<DiscoverPage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Row(
+                        Row(
                           children: [
                             Icon(
-                              Icons.psychology_alt_outlined,
+                              _resultMode == 'mood'
+                                  ? Icons.theater_comedy_outlined
+                                  : Icons.rule_rounded,
                               size: 20,
-                              color: Color(0xFFAFA4FF),
+                              color: const Color(0xFFAFA4FF),
                             ),
-                            SizedBox(width: 8),
+                            const SizedBox(width: 8),
                             Text(
-                              'I understood',
-                              style: TextStyle(fontWeight: FontWeight.w800),
+                              _resultMode == 'mood'
+                                  ? 'Browsing by mood'
+                                  : 'Requirements applied',
+                              style: const TextStyle(fontWeight: FontWeight.w800),
                             ),
                           ],
                         ),
@@ -370,9 +492,7 @@ class _DiscoverPageState extends State<DiscoverPage> {
                                   visualDensity: VisualDensity.compact,
                                   label: Text(label),
                                   backgroundColor: const Color(0xFF231D34),
-                                  side: const BorderSide(
-                                    color: Color(0xFF40365A),
-                                  ),
+                                  side: const BorderSide(color: Color(0xFF40365A)),
                                 ),
                               )
                               .toList(),
@@ -394,7 +514,9 @@ class _DiscoverPageState extends State<DiscoverPage> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        'Curated for you',
+                        _activeMood == null
+                            ? 'Matched to your request'
+                            : '$_activeMood picks',
                         style: Theme.of(context).textTheme.headlineSmall,
                       ),
                       Text(
@@ -429,6 +551,20 @@ class _DiscoverPageState extends State<DiscoverPage> {
       ),
     );
   }
+}
+
+class _MoodOption {
+  const _MoodOption({
+    required this.keyName,
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+  });
+
+  final String keyName;
+  final String title;
+  final String subtitle;
+  final IconData icon;
 }
 
 class _BrandHeader extends StatelessWidget {
@@ -522,8 +658,8 @@ class _ConciergePanel extends StatelessWidget {
           ),
           SizedBox(height: 20),
           Text(
-            'Tell ForFlickSakes your mood and available time. Live TV data '
-            'is searched and ranked into a few confident choices.',
+            'Describe exactly what you want, or browse by mood. Each path is '
+            'kept separate so conflicting instructions never dilute your picks.',
             style: TextStyle(
               color: Color(0xFFB6B0BE),
               fontSize: 16,
@@ -604,6 +740,7 @@ class ResultCard extends StatelessWidget {
                         if (show.year > 0) '${show.year}',
                         if (show.seasons > 0) '${show.seasons} seasons',
                         if (show.runtime > 0) '${show.runtime} min',
+                        if (show.status.isNotEmpty) show.status,
                       ].join(' · '),
                       style: const TextStyle(color: Color(0xFF918B9B)),
                     ),
@@ -832,6 +969,7 @@ class _ShowDetailPageState extends State<ShowDetailPage> {
                     if (show.year > 0) '${show.year}',
                     if (show.seasons > 0) '${show.seasons} seasons',
                     if (show.runtime > 0) '${show.runtime} min',
+                    if (show.status.isNotEmpty) show.status,
                   ].join(' · '),
                   style: const TextStyle(color: Color(0xFF9B95A4)),
                 ),
@@ -844,6 +982,31 @@ class _ShowDetailPageState extends State<ShowDetailPage> {
                       .toList(),
                 ),
                 const SizedBox(height: 22),
+                if (show.matchReasons.isNotEmpty) ...[
+                  Text(
+                    'Why this matched',
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                  const SizedBox(height: 10),
+                  ...show.matchReasons.map(
+                    (reason) => Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Icon(
+                            Icons.check_circle_rounded,
+                            size: 19,
+                            color: Color(0xFF4FD5CB),
+                          ),
+                          const SizedBox(width: 9),
+                          Expanded(child: Text(reason)),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                ],
                 Text('About', style: Theme.of(context).textTheme.titleLarge),
                 const SizedBox(height: 10),
                 Text(

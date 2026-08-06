@@ -14,20 +14,44 @@ class ApiService {
 
   final http.Client _client;
 
-  Future<RecommendationResult> recommend({
+  Future<RecommendationResult> recommendFromPrompt({
     required String query,
+  }) {
+    return _recommend(<String, dynamic>{
+      'mode': 'prompt',
+      'query': query,
+    });
+  }
+
+  Future<RecommendationResult> recommendFromMood({
     required String mood,
-  }) async {
+  }) {
+    return _recommend(<String, dynamic>{
+      'mode': 'mood',
+      'mood': mood.toLowerCase(),
+    });
+  }
+
+  Future<RecommendationResult> _recommend(
+    Map<String, dynamic> body,
+  ) async {
     final response = await _client
         .post(
           Uri.parse('$_baseUrl/recommendations'),
           headers: const {'Content-Type': 'application/json'},
-          body: jsonEncode({'query': query, 'mood': mood}),
+          body: jsonEncode(body),
         )
-        .timeout(const Duration(seconds: 15));
+        .timeout(const Duration(seconds: 20));
 
     if (response.statusCode != 200) {
-      throw Exception('Recommendation service returned ${response.statusCode}.');
+      String message = 'Recommendation service returned ${response.statusCode}.';
+      try {
+        final json = jsonDecode(response.body) as Map<String, dynamic>;
+        message = json['error'] as String? ?? message;
+      } catch (_) {
+        // Preserve the generic message.
+      }
+      throw Exception(message);
     }
 
     return RecommendationResult.fromJson(

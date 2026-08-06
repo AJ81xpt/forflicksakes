@@ -9,6 +9,8 @@ class ShowItem {
     required this.poster,
     required this.summary,
     required this.genres,
+    required this.matchReasons,
+    this.status = '',
     this.imdbId,
     this.officialUrl,
   });
@@ -22,6 +24,8 @@ class ShowItem {
   final String poster;
   final String summary;
   final List<String> genres;
+  final List<String> matchReasons;
+  final String status;
   final String? imdbId;
   final String? officialUrl;
 
@@ -38,6 +42,12 @@ class ShowItem {
       genres: (json['genres'] as List<dynamic>? ?? const <dynamic>[])
           .map((item) => item.toString())
           .toList(),
+      matchReasons:
+          (json['matchReasons'] as List<dynamic>? ?? const <dynamic>[])
+              .map((item) => item.toString())
+              .where((item) => item.isNotEmpty)
+              .toList(),
+      status: json['status'] as String? ?? '',
       imdbId: json['imdbId'] as String?,
       officialUrl: json['officialUrl'] as String?,
     );
@@ -106,10 +116,14 @@ class RecommendationResult {
   const RecommendationResult({
     required this.shows,
     required this.interpretation,
+    required this.mode,
+    this.mood,
   });
 
   final List<ShowItem> shows;
   final List<String> interpretation;
+  final String mode;
+  final String? mood;
 
   factory RecommendationResult.fromJson(Map<String, dynamic> json) {
     return RecommendationResult(
@@ -122,6 +136,8 @@ class RecommendationResult {
               .map((item) => item.toString())
               .where((item) => item.isNotEmpty)
               .toList(),
+      mode: json['mode'] as String? ?? 'prompt',
+      mood: json['mood'] as String?,
     );
   }
 }
