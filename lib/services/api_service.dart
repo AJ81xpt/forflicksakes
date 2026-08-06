@@ -59,6 +59,36 @@ class ApiService {
     );
   }
 
+  Future<void> sendFeedback({
+    required String type,
+    required String reason,
+    int? showId,
+    String? mode,
+    String? mood,
+    String? query,
+    List<int> resultIds = const <int>[],
+  }) async {
+    final response = await _client
+        .post(
+          Uri.parse('$_baseUrl/feedback'),
+          headers: const {'Content-Type': 'application/json'},
+          body: jsonEncode(<String, dynamic>{
+            'type': type,
+            'reason': reason,
+            'showId': showId,
+            'mode': mode,
+            'mood': mood,
+            'query': query,
+            'resultIds': resultIds,
+          }),
+        )
+        .timeout(const Duration(seconds: 10));
+
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw Exception('Feedback could not be saved.');
+    }
+  }
+
   Future<WatchOptions> watchOptions({
     required int showId,
     required String region,

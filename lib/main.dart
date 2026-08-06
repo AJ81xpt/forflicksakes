@@ -154,6 +154,8 @@ class _DiscoverPageState extends State<DiscoverPage> {
   String _resultMode = 'prompt';
   List<ShowItem> _results = const <ShowItem>[];
   List<String> _interpretation = const <String>[];
+  String _lastQuery = '';
+
 
   static const moods = <_MoodOption>[
     _MoodOption(
@@ -202,6 +204,7 @@ class _DiscoverPageState extends State<DiscoverPage> {
       _activeMood = null;
       _resultMode = 'prompt';
       _interpretation = const <String>[];
+      _lastQuery = query;
     });
 
     try {
@@ -233,6 +236,7 @@ class _DiscoverPageState extends State<DiscoverPage> {
       _activeMood = mood.title;
       _resultMode = 'mood';
       _interpretation = <String>['Mood: ${mood.title}'];
+      _lastQuery = '';
     });
 
     try {
@@ -305,6 +309,66 @@ class _DiscoverPageState extends State<DiscoverPage> {
         ),
       ),
     );
+  }
+
+  Future<void> _showResultsFeedback() async {
+    final reason = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      backgroundColor: const Color(0xFF15111D),
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 4, 20, 28),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'What was wrong with these picks?',
+                style: Theme.of(sheetContext).textTheme.headlineSmall,
+              ),
+              const SizedBox(height: 8),
+              const Text('This helps us tighten future recommendations.'),
+              const SizedBox(height: 18),
+              for (final option in const <String>[
+                'Wrong genre',
+                'Ignored my limits',
+                'Too broad',
+                'Already watched these',
+                'Not available on my services',
+                'Other',
+              ])
+                ListTile(
+                  title: Text(option),
+                  trailing: const Icon(Icons.chevron_right_rounded),
+                  onTap: () => Navigator.pop(sheetContext, option),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    if (reason == null || !mounted) return;
+    try {
+      await _api.sendFeedback(
+        type: 'result_set',
+        reason: reason,
+        mode: _resultMode,
+        mood: _activeMood,
+        query: _lastQuery,
+        resultIds: _results.map((show) => show.id).toList(),
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Thanks — feedback saved.')),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Feedback could not be saved.')),
+      );
+    }
   }
 
   @override
@@ -537,7 +601,13 @@ class _DiscoverPageState extends State<DiscoverPage> {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 6),
+                  OutlinedButton.icon(
+                    onPressed: _showResultsFeedback,
+                    icon: const Icon(Icons.tune_rounded),
+                    label: const Text("These aren't right"),
+                  ),
+                  const SizedBox(height: 14),
                   const Text(
                     'TV metadata supplied by TVMaze.',
                     textAlign: TextAlign.center,
@@ -759,6 +829,13 @@ class ResultCard extends StatelessWidget {
                           'Live data',
                           style: TextStyle(color: Color(0xFF4FD5CB)),
                         ),
+                        if (show.confidence > 0) ...[
+                          const SizedBox(width: 10),
+                          Text(
+                            '${show.confidence}% match',
+                            style: const TextStyle(color: Color(0xFFAFA4FF)),
+                          ),
+                        ],
                       ],
                     ),
                     const SizedBox(height: 14),
@@ -816,6 +893,25 @@ class _ShowDetailPageState extends State<ShowDetailPage> {
   void initState() {
     super.initState();
     _loadOptions();
+  }
+
+  Future<void> _sendShowFeedback(String reason) async {
+    try {
+      await _api.sendFeedback(
+        type: 'show',
+        reason: reason,
+        showId: widget.show.id,
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Saved: $reason')),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Feedback could not be saved.')),
+      );
+    }
   }
 
   Future<void> _loadOptions() async {
@@ -1040,6 +1136,31 @@ class _ShowDetailPageState extends State<ShowDetailPage> {
                         ),
                       ),
                     ),
+                  ],
+                ),
+                const SizedBox(height: 30),
+                Text(
+                  'Help improve your picks',
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final option in const <String>[
+                      'Loved it',
+                      'Not interested',
+                      'Already watched',
+                      'Wrong genre',
+                      'Too dark',
+                      'Too slow',
+                      'Wrong service',
+                    ])
+                      ActionChip(
+                        label: Text(option),
+                        onPressed: () => _sendShowFeedback(option),
+                      ),
                   ],
                 ),
                 const SizedBox(height: 32),

@@ -75,6 +75,8 @@ const genericQueryWords = new Set([
 ]);
 
 let catalogueCache = { expiresAt: 0, shows: [] };
+const feedbackEvents = [];
+
 
 async function tvMazeJson(url) {
   const response = await fetch(url, {
@@ -241,22 +243,46 @@ function violatesExcludedTerms(facts, terms) {
   return false;
 }
 
-function passesPromptFilters(show, interpretation) {
-  const facts = showFacts(show);
-  if (interpretation.maxSeasons && facts.seasons && facts.seasons > interpretation.maxSeasons) return false;
-  if (interpretation.maxRuntime && facts.runtime && facts.runtime > interpretation.maxRuntime) return false;
-  if (interpretation.completedOnly && show.status !== 'Ended') return false;
-  if (interpretation.excludedGenres.some((genre) => facts.genres.includes(genre))) return false;
-  if (violatesExcludedTerms(facts, interpretation.excludedTerms)) return false;
+function semanticGenreMatch(facts, genre) {
+  const normalized = String(genre).toLowerCase();
+  if (facts.genres.some((item) => item.toLowerCase() === normalized)) return true;
 
-  // Explicit requested genres are hard requirements. A result must match at least one.
-  if (interpretation.requiredGenres.length) {
-    const matchesRequired = interpretation.requiredGenres.some((genre) =>
-      facts.genres.some((item) => item.toLowerCase() === genre.toLowerCase()),
-    );
-    if (!matchesRequired) return false;
-  }
-  return true;
+  const patterns = {
+    thriller: /suspense|conspiracy|espionage|danger|hunt|kidnap|hostage|psychological|serial killer|murder|investigation|secret|race against time/,
+    mystery: /mystery|detective|investigation|missing|murder|secret|puzzle|whodunnit|twist/,
+    crime: /crime|criminal|police|detective|murder|gang|mafia|heist|corruption/,
+    comedy: /comedy|sitcom|funny|witty|satire|comic|humou?r/,
+    romance: /romance|romantic|love story|relationship/,
+    horror: /horror|haunted|supernatural terror|demon|ghost|terrifying/,
+    'science-fiction': /science fiction|sci-fi|future|space|technology|dystopian|time travel|alien/,
+    fantasy: /fantasy|magic|mythical|witch|wizard|dragon/,
+    action: /action|combat|fight|mission|adventure|warrior/,
+    drama: /drama|emotional|family conflict|relationship/,
+    animation: /animated|animation|anime/,
+    family: /family|kids|children|all ages/,
+  };
+  return patterns[normalized]?.test(facts.haystack) || false;
+}
+
+function promptMatchAudit(show, interpretation) {
+  const facts = showFacts(show);
+  const requiredMatches = interpretation.requiredGenres.filter((genre) =>
+    semanticGenreMatch(facts, genre),
+  );
+  const requiredMisses = interpretation.requiredGenres.filter((genre) =>
+    !semanticGenreMatch(facts, genre),
+  );
+  const passed = requiredMisses.length === 0
+    && !(interpretation.maxSeasons && facts.seasons && facts.seasons > interpretation.maxSeasons)
+    && !(interpretation.maxRuntime && facts.runtime && facts.runtime > interpretation.maxRuntime)
+    && !(interpretation.completedOnly && show.status !== 'Ended')
+    && !interpretation.excludedGenres.some((genre) => semanticGenreMatch(facts, genre))
+    && !violatesExcludedTerms(facts, interpretation.excludedTerms);
+  return { passed, requiredMatches, requiredMisses, facts };
+}
+
+function passesPromptFilters(show, interpretation) {
+  return promptMatchAudit(show, interpretation).passed;
 }
 
 function moodRelevance(show, mood) {
@@ -278,36 +304,38 @@ function moodRelevance(show, mood) {
 }
 
 function promptScore(show, query, interpretation) {
-  const facts = showFacts(show);
-  let score = Number(show.rating?.average || 0) * 1.2;
-  score += Math.min(Number(show.weight || 0), 100) / 45;
+  const audit = promptMatchAudit(show, interpretation);
+  const facts = audit.facts;
+  let score = 0;
 
-  for (const genre of interpretation.requiredGenres) {
-    if (facts.genres.some((item) => item.toLowerCase() === genre.toLowerCase())) score += 7;
-  }
+  // Relevance dominates popularity. Ratings only refine already-valid matches.
+  score += audit.requiredMatches.length * 18;
+  score += Number(show.rating?.average || 0) * 0.8;
+  score += Math.min(Number(show.weight || 0), 100) / 80;
+
   for (const genre of interpretation.referenceGenres || []) {
-    if (facts.genres.some((item) => item.toLowerCase() === String(genre).toLowerCase())) score += 3;
+    if (semanticGenreMatch(facts, genre)) score += 4;
   }
   for (const token of queryTokens(query)) {
-    if (facts.title.includes(token)) score += 2.2;
-    else if (facts.haystack.includes(token)) score += 0.8;
+    if (facts.title.includes(token)) score += 2;
+    else if (facts.haystack.includes(token)) score += 1.1;
   }
-  if (!show.image?.medium && !show.image?.original) score -= 8;
-  if (!show.summary) score -= 2;
+  if (interpretation.completedOnly && show.status === 'Ended') score += 5;
+  if (interpretation.maxSeasons && facts.seasons && facts.seasons <= interpretation.maxSeasons) score += 3;
+  if (interpretation.maxRuntime && facts.runtime && facts.runtime <= interpretation.maxRuntime) score += 3;
+  if (!show.image?.medium && !show.image?.original) score -= 12;
+  if (!show.summary) score -= 4;
   return score;
 }
 
 function promptReasons(show, interpretation) {
-  const facts = showFacts(show);
+  const audit = promptMatchAudit(show, interpretation);
   const reasons = [];
-  const matchedGenres = interpretation.requiredGenres.filter((genre) =>
-    facts.genres.some((item) => item.toLowerCase() === genre.toLowerCase()),
-  );
-  if (matchedGenres.length) reasons.push(`Matches ${matchedGenres.join(' / ')}`);
+  if (audit.requiredMatches.length) reasons.push(`Required match: ${audit.requiredMatches.join(' / ')}`);
   if (interpretation.completedOnly && show.status === 'Ended') reasons.push('Completed series');
-  if (interpretation.maxSeasons && facts.seasons) reasons.push(`${facts.seasons} seasons`);
-  if (interpretation.maxRuntime && facts.runtime) reasons.push(`${facts.runtime}-minute episodes`);
-  if (interpretation.referenceGenres?.length) reasons.push(`Shares genres with ${interpretation.referenceName || interpretation.referenceTitle}`);
+  if (interpretation.maxSeasons && audit.facts.seasons) reasons.push(`Within limit: ${audit.facts.seasons} seasons`);
+  if (interpretation.maxRuntime && audit.facts.runtime) reasons.push(`Within limit: ${audit.facts.runtime}-minute episodes`);
+  if (interpretation.referenceGenres?.length) reasons.push(`Shares themes with ${interpretation.referenceName || interpretation.referenceTitle}`);
   if (show.rating?.average) reasons.push(`Rated ${show.rating.average}/10`);
   return reasons.slice(0, 5);
 }
@@ -335,6 +363,7 @@ function toShowItem(show, score = 0, matchReasons = []) {
     officialUrl: show.officialSite || show.url || null,
     source: 'TVMaze',
     recommendationScore: score,
+    confidence: Math.max(0, Math.min(100, Math.round(score * 3))),
     matchReasons,
   };
 }
@@ -360,9 +389,9 @@ async function promptCandidates(query, interpretation) {
       score: promptScore(show, query, interpretation),
       reasons: promptReasons(show, interpretation),
     }))
-    .filter((item) => item.score > 3)
+    .filter((item) => item.score >= (interpretation.requiredGenres.length ? 16 : 6))
     .sort((a, b) => b.score - a.score)
-    .slice(0, 12);
+    .slice(0, 10);
 }
 
 async function moodCandidates(mood) {
@@ -412,6 +441,7 @@ app.get('/health', (_request, response) => {
     catalogue: 'TVMaze',
     recommendationModes: ['prompt', 'mood'],
     providers: watchmodeKey ? 'Watchmode' : 'not-configured',
+    feedbackEvents: feedbackEvents.length,
   });
 });
 
@@ -466,6 +496,24 @@ app.post('/recommendations', async (request, response) => {
     console.error(error);
     response.status(502).json({ error: 'Live catalogue lookup failed.' });
   }
+});
+
+app.post('/feedback', (request, response) => {
+  const event = {
+    at: new Date().toISOString(),
+    type: String(request.body?.type || 'general'),
+    reason: String(request.body?.reason || '').slice(0, 120),
+    showId: Number(request.body?.showId || 0) || null,
+    mode: String(request.body?.mode || ''),
+    mood: String(request.body?.mood || ''),
+    query: String(request.body?.query || '').slice(0, 300),
+    resultIds: Array.isArray(request.body?.resultIds)
+      ? request.body.resultIds.map(Number).filter(Number.isFinite).slice(0, 10)
+      : [],
+  };
+  feedbackEvents.push(event);
+  if (feedbackEvents.length > 500) feedbackEvents.shift();
+  response.status(202).json({ ok: true });
 });
 
 app.get('/shows/:id/providers', async (request, response) => {

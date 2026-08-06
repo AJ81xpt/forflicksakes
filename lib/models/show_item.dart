@@ -10,6 +10,7 @@ class ShowItem {
     required this.summary,
     required this.genres,
     required this.matchReasons,
+    this.confidence = 0,
     this.status = '',
     this.imdbId,
     this.officialUrl,
@@ -25,6 +26,7 @@ class ShowItem {
   final String summary;
   final List<String> genres;
   final List<String> matchReasons;
+  final int confidence;
   final String status;
   final String? imdbId;
   final String? officialUrl;
@@ -47,6 +49,7 @@ class ShowItem {
               .map((item) => item.toString())
               .where((item) => item.isNotEmpty)
               .toList(),
+      confidence: (json['confidence'] as num?)?.toInt() ?? 0,
       status: json['status'] as String? ?? '',
       imdbId: json['imdbId'] as String?,
       officialUrl: json['officialUrl'] as String?,
