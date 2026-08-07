@@ -631,6 +631,10 @@ app.post('/feedback', (request, response) => {
   response.status(202).json({ ok: true });
 });
 
+function normalizeProviderName(name) {
+  return name === 'Max' ? 'HBO Max' : name;
+}
+
 app.get('/shows/:id/providers', async (request, response) => {
   try {
     const region = String(request.query.region || 'ZA').toUpperCase();
@@ -650,7 +654,7 @@ app.get('/shows/:id/providers', async (request, response) => {
     const providers = sources
       .filter((source) => source?.name && (source?.web_url || source?.ios_url || source?.android_url))
       .map((source) => ({
-        name: source.name,
+        name: normalizeProviderName(source.name),
         type: source.type || 'stream',
         webUrl: source.web_url || null,
         iosUrl: source.ios_url || null,

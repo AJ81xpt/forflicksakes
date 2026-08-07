@@ -31,6 +31,23 @@ class ShowItem {
   final String? imdbId;
   final String? officialUrl;
 
+  Map<String, dynamic> toJson() => <String, dynamic>{
+        'id': id,
+        'title': title,
+        'year': year,
+        'seasons': seasons,
+        'runtime': runtime,
+        'rating': rating,
+        'poster': poster,
+        'summary': summary,
+        'genres': genres,
+        'matchReasons': matchReasons,
+        'confidence': confidence,
+        'status': status,
+        'imdbId': imdbId,
+        'officialUrl': officialUrl,
+      };
+
   factory ShowItem.fromJson(Map<String, dynamic> json) {
     return ShowItem(
       id: (json['id'] as num?)?.toInt() ?? 0,
@@ -78,7 +95,7 @@ class WatchProvider {
 
   factory WatchProvider.fromJson(Map<String, dynamic> json) {
     return WatchProvider(
-      name: json['name'] as String? ?? 'Provider',
+      name: _normalizeProviderName(json['name'] as String? ?? 'Provider'),
       type: json['type'] as String? ?? 'stream',
       webUrl: json['webUrl'] as String?,
       iosUrl: json['iosUrl'] as String?,
@@ -144,3 +161,5 @@ class RecommendationResult {
     );
   }
 }
+
+String _normalizeProviderName(String name) => name == 'Max' ? 'HBO Max' : name;

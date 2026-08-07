@@ -69,13 +69,14 @@ class _AppShellState extends State<AppShell> {
   int _index = 0;
   bool _loadingProfile = true;
   String _region = 'ZA';
-  Set<String> _services = <String>{'Netflix', 'Prime Video', 'Max', 'Showmax'};
+  Set<String> _services = <String>{'Netflix', 'Prime Video', 'HBO Max', 'Showmax'};
   int _maxSeasons = 3;
   bool _completedOnly = false;
   Set<int> _saved = <int>{};
   Set<int> _dismissed = <int>{};
   Set<int> _watched = <int>{};
   Map<String, int> _feedbackCounts = <String, int>{};
+  Map<int, ShowItem> _knownShows = <int, ShowItem>{};
 
   @override
   void initState() {
@@ -95,6 +96,7 @@ class _AppShellState extends State<AppShell> {
       _dismissed = snapshot.dismissedIds;
       _watched = snapshot.watchedIds;
       _feedbackCounts = snapshot.feedbackCounts;
+      _knownShows = snapshot.knownShows;
       _loadingProfile = false;
     });
   }
@@ -111,6 +113,16 @@ class _AppShellState extends State<AppShell> {
       if (!_saved.add(id)) _saved.remove(id);
     });
     _personalization.saveSavedIds(_saved);
+  }
+
+  Future<void> _rememberShows(Iterable<ShowItem> shows) async {
+    await _personalization.saveKnownShows(shows);
+    if (!mounted) return;
+    setState(() {
+      for (final show in shows) {
+        _knownShows[show.id] = show;
+      }
+    });
   }
 
   Future<void> _recordLocalFeedback(int showId, String reason) async {
@@ -135,8 +147,15 @@ class _AppShellState extends State<AppShell> {
         excludedIds: {..._dismissed, ..._watched},
         onToggleSaved: _toggleSaved,
         onFeedback: _recordLocalFeedback,
+        onShowsSeen: _rememberShows,
       ),
-      WatchlistPage(saved: _saved, onToggleSaved: _toggleSaved),
+      WatchlistPage(
+        saved: _saved,
+        knownShows: _knownShows,
+        region: _region,
+        onToggleSaved: _toggleSaved,
+        onFeedback: _recordLocalFeedback,
+      ),
       ProfilePage(
         region: _region,
         services: _services,
@@ -218,6 +237,7 @@ class DiscoverPage extends StatefulWidget {
     required this.excludedIds,
     required this.onToggleSaved,
     required this.onFeedback,
+    required this.onShowsSeen,
     super.key,
   });
 
@@ -229,6 +249,7 @@ class DiscoverPage extends StatefulWidget {
   final Set<int> excludedIds;
   final ValueChanged<int> onToggleSaved;
   final Future<void> Function(int showId, String reason) onFeedback;
+  final Future<void> Function(Iterable<ShowItem> shows) onShowsSeen;
 
   @override
   State<DiscoverPage> createState() => _DiscoverPageState();
@@ -306,6 +327,7 @@ class _DiscoverPageState extends State<DiscoverPage> {
         completedOnly: widget.completedOnly,
         excludedIds: widget.excludedIds,
       );
+      await widget.onShowsSeen(recommendation.shows);
       if (!mounted) return;
       setState(() {
         _results = recommendation.shows;
@@ -345,6 +367,7 @@ class _DiscoverPageState extends State<DiscoverPage> {
         completedOnly: widget.completedOnly,
         excludedIds: widget.excludedIds,
       );
+      await widget.onShowsSeen(recommendation.shows);
       if (!mounted) return;
       setState(() {
         _results = recommendation.shows;
@@ -715,6 +738,18 @@ class _DiscoverPageState extends State<DiscoverPage> {
                         style: Theme.of(context).textTheme.bodyLarge,
                       ),
                     ],
+                  ),
+                  const SizedBox(height: 8),
+                  const Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      'For Flick Sakes... pick one.',
+                      style: TextStyle(
+                        color: Color(0xFFD7B8FF),
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
                   ),
                   const SizedBox(height: 18),
                   ..._results.map(
@@ -1523,15 +1558,24 @@ class _Poster extends StatelessWidget {
 class WatchlistPage extends StatelessWidget {
   const WatchlistPage({
     required this.saved,
+    required this.knownShows,
+    required this.region,
     required this.onToggleSaved,
+    required this.onFeedback,
     super.key,
   });
 
   final Set<int> saved;
+  final Map<int, ShowItem> knownShows;
+  final String region;
   final ValueChanged<int> onToggleSaved;
+  final Future<void> Function(int showId, String reason) onFeedback;
 
   @override
   Widget build(BuildContext context) {
+    final shows = saved.map((id) => knownShows[id]).whereType<ShowItem>().toList()
+      ..sort((a, b) => a.title.compareTo(b.title));
+
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(24, 28, 24, 110),
@@ -1540,15 +1584,46 @@ class WatchlistPage extends StatelessWidget {
           children: [
             Text('Watchlist', style: Theme.of(context).textTheme.headlineLarge),
             const SizedBox(height: 10),
-            const Text('Saved live titles will appear here during this session.'),
-            const Expanded(
-              child: Center(
-                child: Text(
-                  'Cloud-synced watchlists are the next milestone.',
-                  textAlign: TextAlign.center,
+            Text(saved.isEmpty ? 'Save a recommendation and it will appear here.' : '${saved.length} saved ${saved.length == 1 ? 'title' : 'titles'}'),
+            const SizedBox(height: 22),
+            if (saved.isEmpty)
+              const Expanded(
+                child: Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.bookmark_border_rounded, size: 52, color: Color(0xFFD7B8FF)),
+                      SizedBox(height: 14),
+                      Text('For Flick Sakes... save something worth watching.', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800), textAlign: TextAlign.center),
+                      SizedBox(height: 8),
+                      Text('Save picks from Discover to keep them here.', textAlign: TextAlign.center),
+                    ],
+                  ),
+                ),
+              )
+            else if (shows.isEmpty)
+              const Expanded(
+                child: Center(
+                  child: Text('Your saved titles are preserved. Open Discover once while online to refresh their details.', textAlign: TextAlign.center),
+                ),
+              )
+            else
+              Expanded(
+                child: ListView.separated(
+                  itemCount: shows.length,
+                  separatorBuilder: (context, index) => const SizedBox(height: 14),
+                  itemBuilder: (context, index) {
+                    final show = shows[index];
+                    return ResultCard(
+                      show: show,
+                      region: region,
+                      saved: true,
+                      onToggleSaved: () => onToggleSaved(show.id),
+                      onFeedback: (reason) => onFeedback(show.id, reason),
+                    );
+                  },
                 ),
               ),
-            ),
           ],
         ),
       ),
@@ -1587,7 +1662,7 @@ class ProfilePage extends StatelessWidget {
   final Future<void> Function() onReset;
 
   static const serviceOptions = <String>[
-    'Netflix', 'Prime Video', 'Apple TV+', 'Disney+', 'Max', 'Showmax', 'DStv Stream',
+    'Netflix', 'Prime Video', 'Apple TV+', 'Disney+', 'HBO Max', 'Showmax', 'DStv Stream',
   ];
 
   static const regions = <String, String>{
