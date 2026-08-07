@@ -16,21 +16,47 @@ class ApiService {
 
   Future<RecommendationResult> recommendFromPrompt({
     required String query,
+    required String region,
+    required Set<String> services,
+    required int maxSeasons,
+    required bool completedOnly,
+    required Set<int> excludedIds,
   }) {
     return _recommend(<String, dynamic>{
       'mode': 'prompt',
       'query': query,
+      'profile': _profile(region, services, maxSeasons, completedOnly, excludedIds),
     });
   }
 
   Future<RecommendationResult> recommendFromMood({
     required String mood,
+    required String region,
+    required Set<String> services,
+    required int maxSeasons,
+    required bool completedOnly,
+    required Set<int> excludedIds,
   }) {
     return _recommend(<String, dynamic>{
       'mode': 'mood',
       'mood': mood.toLowerCase(),
+      'profile': _profile(region, services, maxSeasons, completedOnly, excludedIds),
     });
   }
+
+  Map<String, dynamic> _profile(
+    String region,
+    Set<String> services,
+    int maxSeasons,
+    bool completedOnly,
+    Set<int> excludedIds,
+  ) => <String, dynamic>{
+        'region': region,
+        'services': services.toList(),
+        'maxSeasons': maxSeasons,
+        'completedOnly': completedOnly,
+        'excludedIds': excludedIds.toList(),
+      };
 
   Future<RecommendationResult> _recommend(
     Map<String, dynamic> body,

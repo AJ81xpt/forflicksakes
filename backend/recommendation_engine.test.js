@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { auditPrompt, parsePrompt, scoreMood, scorePrompt } from './recommendation_engine.js';
+import { auditPrompt, looksLikeTitleLookup, normalizeTitle, parsePrompt, scoreMood, scorePrompt } from './recommendation_engine.js';
 
 const show = (overrides = {}) => ({
   id: 1,
@@ -56,4 +56,44 @@ test('prompt score returns transparent reasons', () => {
   const result = scorePrompt(candidate, intent.raw, intent);
   assert.equal(result.passed, true);
   assert.ok(result.reasons.some((reason) => reason.includes('Required match')));
+});
+
+
+test('happy prompt is treated as feel-good intent, not a title-word search', () => {
+  const intent = parsePrompt('I want a happy show');
+  assert.ok(intent.themes.includes('feelGood'));
+
+  const bleakTitleMatch = show({
+    name: 'Happy Valley Murders',
+    genres: ['Crime', 'Thriller'],
+    summary: 'A bleak murder investigation in a grim town.',
+  });
+  const warmComedy = show({
+    name: 'Sunshine Club',
+    genres: ['Comedy'],
+    summary: 'A warm, uplifting comedy about friendship and community.',
+  });
+
+  assert.equal(scorePrompt(bleakTitleMatch, intent.raw, intent).passed, false);
+  assert.equal(scorePrompt(warmComedy, intent.raw, intent).passed, true);
+  assert.ok(scorePrompt(warmComedy, intent.raw, intent).score > 0);
+});
+
+
+test('bare known-looking names are treated as title lookups', () => {
+  assert.equal(looksLikeTitleLookup('Severance'), true);
+  assert.equal(looksLikeTitleLookup('The Bear'), true);
+  assert.equal(looksLikeTitleLookup('Dark'), true);
+});
+
+test('descriptive requests are not mistaken for exact title searches', () => {
+  assert.equal(looksLikeTitleLookup('something dark'), false);
+  assert.equal(looksLikeTitleLookup('something like Dark'), false);
+  assert.equal(looksLikeTitleLookup('I want a happy show'), false);
+  assert.equal(looksLikeTitleLookup('completed thriller under 3 seasons'), false);
+});
+
+test('title normalization ignores punctuation and case', () => {
+  assert.equal(normalizeTitle('Happy!'), normalizeTitle('happy'));
+  assert.equal(normalizeTitle('MR. ROBOT'), normalizeTitle('Mr Robot'));
 });

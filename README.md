@@ -1,128 +1,49 @@
-# ForFlickSakes — Free Live Data Patch
+# ForFlickSakes v5 — Accuracy and Feedback
 
-This patch makes the current Android/iOS app live using:
+This patch builds on separated prompt/mood modes.
 
-- **TVMaze** for real TV titles, posters, summaries, genres, ratings and seasons. No API key is required.
-- **Watchmode (optional)** for verified provider names and outbound links. A free developer key can be used while testing.
-- A regional **JustWatch search fallback** when Watchmode is not configured or does not return coverage. The app does not claim a provider unless the backend returned verified data.
+## Changes
 
-## 1. Back up and copy the files
+- Explicit prompt genres are enforced before ranking.
+- Semantic genre matching supports TVMaze summaries as well as genre labels.
+- Popularity and rating cannot rescue a title that fails a hard requirement.
+- Season, runtime, completed-status and exclusions remain hard filters.
+- Weak matches are removed; the app may return fewer results instead of unrelated ones.
+- Result cards show an estimated match percentage.
+- Added “These aren't right” feedback for a recommendation set.
+- Added show-level feedback: Loved it, Not interested, Already watched, Wrong genre, Too dark, Too slow and Wrong service.
+- Feedback is accepted by the backend. In this MVP patch it is kept in server memory and resets when the backend restarts.
 
-From the existing project root, back up your current files first.
+## Apply
 
-Windows PowerShell:
+Extract outside the Flutter repository. Copy `lib`, `backend`, and `test` into the project root and replace matching files.
+
+Restart the backend after copying.
+
+### Windows backend
 
 ```powershell
-Copy-Item .\lib .\lib_before_live -Recurse
-Copy-Item .\test .\test_before_live -Recurse
+cd C:\dev\forflicksakes\backend
+npm.cmd install
+npm.cmd run check
+npm.cmd start
 ```
 
-Copy the patch's `lib`, `test`, and `backend` folders into the Flutter project root. Replace matching files.
-
-Do not leave the outer extracted patch folder inside the Flutter project.
-
-## 2. Add Flutter dependencies
+### Android
 
 ```powershell
-flutter pub add http
-flutter pub add url_launcher
+cd C:\dev\forflicksakes
 flutter clean
 flutter pub get
 flutter analyze
 flutter test
-```
-
-## 3. Start the backend
-
-Install Node.js 20 or newer.
-
-Windows:
-
-```powershell
-cd backend
-Copy-Item .env.example .env
-npm install
-npm run check
-npm start
-```
-
-Mac:
-
-```bash
-cd backend
-cp .env.example .env
-npm install
-npm run check
-npm start
-```
-
-The backend should print:
-
-```text
-ForFlickSakes live backend running on http://localhost:8080
-```
-
-Test it in another terminal:
-
-```text
-http://localhost:8080/health
-```
-
-## 4. Run Android live
-
-Keep the backend terminal running. From the Flutter project root:
-
-```powershell
 flutter run -d emulator-5554 --dart-define=API_BASE_URL=http://10.0.2.2:8080
 ```
 
-## 5. Run iOS live
+Test prompts:
 
-Run the backend on the Mac, then:
+- `A completed thriller with no more than 3 seasons`
+- `A funny 30-minute series with no romance`
+- `A clever mystery like Severance, but not too dark`
 
-```bash
-flutter run -d "iPhone 17 Pro" --dart-define=API_BASE_URL=http://127.0.0.1:8080
-```
-
-## 6. Optional verified Where to Watch
-
-Create a free Watchmode developer API key, then put it in `backend/.env`:
-
-```env
-WATCHMODE_API_KEY=your_key_here
-```
-
-Restart the backend after changing `.env`.
-
-Without the key:
-
-- Live TVMaze recommendations still work.
-- Show details still work.
-- Where to Watch opens a regional viewing-options search.
-- The app does not falsely display a provider.
-
-With a supported Watchmode result:
-
-- Provider name and availability type are displayed.
-- Watch Now opens the returned provider web link.
-
-## 7. Commit only after both platforms work
-
-Windows:
-
-```powershell
-git add lib test backend pubspec.yaml pubspec.lock
-git commit -m "Add live TV catalogue and viewing options"
-git push
-```
-
-Mac:
-
-```bash
-git pull
-flutter pub get
-```
-
-## Current scope
-
-This first live milestone covers television programmes. Movies can be added through a second licensed source after reviewing its commercial terms. OMDb's publicly stated content licence is non-commercial, so this patch intentionally does not use it for the public app.
+For the thriller test, ordinary comedies should not pass. Fewer than five results is acceptable when only a few titles meet every constraint.

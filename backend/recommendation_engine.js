@@ -3,6 +3,44 @@ const stripHtml = (value = '') => String(value)
   .replace(/\s+/g, ' ')
   .trim();
 
+
+
+export function normalizeTitle(value) {
+  return String(value || '')
+    .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/&/g, ' and ')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+export function looksLikeTitleLookup(query) {
+  const raw = String(query || '').trim();
+  if (!raw) return false;
+  const lower = raw.toLowerCase();
+  const words = normalizeTitle(raw).split(' ').filter(Boolean);
+  if (!words.length || words.length > 8) return false;
+
+  // These constructions clearly describe intent rather than naming a title.
+  const intentPatterns = [
+    /\b(?:something|anything|show|series|programme|program|watch)\b/i,
+    /\b(?:i\s+(?:want|need|feel like|am looking for)|looking for|find me|recommend)\b/i,
+    /\b(?:like|similar to)\b/i,
+    /\b(?:under|over|less than|more than|no more than|up to|max(?:imum)?)\b/i,
+    /\b(?:completed|finished|ended|ongoing|running)\b/i,
+    /\b(?:no|not|without|avoid)\b/i,
+    /\b(?:minutes?|mins?|seasons?|episodes?)\b/i,
+    /\b(?:happy|happier|cheerful|joyful|feel[- ]good|uplifting|comforting|funny|gripping|clever)\b/i,
+  ];
+
+  // Bare "Dark" is intentionally allowed as a title lookup. "Something dark"
+  // is caught by the descriptive construction above.
+  if (lower === 'dark') return true;
+  return !intentPatterns.some((pattern) => pattern.test(raw));
+}
+
 const GENRE_ALIASES = {
   thriller: ['Thriller'],
   suspense: ['Thriller'],
@@ -81,7 +119,8 @@ const THEME_RULES = {
   psychological: /\b(?:psychological|mind games?|identity|obsession|paranoia)\b/i,
   slowBurn: /\b(?:slow[- ]burn|patient|atmospheric|meditative)\b/i,
   fastPaced: /\b(?:fast[- ]paced|quick|propulsive|nonstop|high[- ]energy)\b/i,
-  light: /\b(?:light|lighter|feel[- ]good|uplifting|easy watch|comforting)\b/i,
+  light: /\b(?:light|lighter|easy watch|comforting)\b/i,
+  feelGood: /\b(?:happy|happier|cheerful|joyful|feel[- ]good|uplifting|positive|lighthearted|heartwarming)\b/i,
   dark: /\b(?:dark|bleak|grim|disturbing|unsettling)\b/i,
 };
 
@@ -212,6 +251,7 @@ export function auditPrompt(show, intent) {
   if (intent.exclusions.includes('dark') && profile.attributes.darkness >= 4) violations.push('Too dark');
   if (intent.exclusions.includes('violence') && /violence|violent|war|murder|killer|combat|torture|gore/.test(profile.text)) violations.push('Violence');
   if (intent.exclusions.includes('slow') && profile.attributes.pace <= 2) violations.push('Too slow');
+  if (intent.themes.includes('feelGood') && (profile.attributes.comfort < 2 || profile.attributes.darkness >= 4)) violations.push('Not feel-good');
 
   return { passed: violations.length === 0, violations, requiredMatches, profile };
 }
@@ -224,6 +264,7 @@ function themeScore(profile, themes) {
     if (theme === 'slowBurn') score += profile.attributes.pace <= 2 ? 7 : -4;
     if (theme === 'fastPaced') score += profile.attributes.pace >= 4 ? 7 : -5;
     if (theme === 'light') score += profile.attributes.comfort * 2 - profile.attributes.darkness;
+    if (theme === 'feelGood') score += profile.attributes.comfort * 3 + profile.attributes.humour - profile.attributes.darkness * 2;
     if (theme === 'dark') score += profile.attributes.darkness * 2;
   }
   return score;
@@ -243,10 +284,17 @@ export function scorePrompt(show, query, intent) {
   if (intent.maxRuntime && p.runtime <= intent.maxRuntime) score += 5;
   for (const genre of intent.referenceGenres || []) if (genreMatches(p, genre)) score += 6;
 
-  const tokens = String(query || '').toLowerCase().match(/[a-z0-9-]{4,}/g) || [];
+  const intentWords = new Set([
+    'happy', 'happier', 'cheerful', 'joyful', 'feel-good', 'uplifting',
+    'positive', 'lighthearted', 'heartwarming', 'comforting', 'funny',
+    'dark', 'gripping', 'clever', 'completed', 'finished', 'seasons',
+    'season', 'series', 'shows', 'show', 'something', 'watch',
+  ]);
+  const tokens = (String(query || '').toLowerCase().match(/[a-z0-9-]{4,}/g) || [])
+    .filter((token) => !intentWords.has(token));
   for (const token of tokens) {
-    if (p.title.includes(token)) score += 2;
-    else if (p.text.includes(token)) score += 0.6;
+    if (p.title.includes(token)) score += 1;
+    else if (p.text.includes(token)) score += 0.4;
   }
   if (!show?.image?.medium && !show?.image?.original) score -= 15;
 
@@ -258,6 +306,7 @@ export function scorePrompt(show, query, intent) {
   if (intent.referenceGenres?.length) reasons.push(`Shares genres with ${intent.referenceName || intent.referenceTitle}`);
   if (intent.themes.includes('twisty') && p.attributes.complexity >= 3) reasons.push('Twisty, puzzle-led storytelling');
   if (intent.themes.includes('light') && p.attributes.comfort >= 3) reasons.push('Lighter, more comforting tone');
+  if (intent.themes.includes('feelGood') && p.attributes.comfort >= 2) reasons.push('Warm, upbeat feel-good tone');
   if (p.rating) reasons.push(`Rated ${p.rating}/10`);
 
   return { passed: true, score, reasons: reasons.slice(0, 5), audit };

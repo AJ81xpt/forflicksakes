@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import 'models/show_item.dart';
 import 'services/api_service.dart';
+import 'services/personalization_store.dart';
 
 void main() => runApp(const ForFlickSakesApp());
 
@@ -64,14 +65,62 @@ class AppShell extends StatefulWidget {
 }
 
 class _AppShellState extends State<AppShell> {
+  final PersonalizationStore _personalization = PersonalizationStore();
   int _index = 0;
+  bool _loadingProfile = true;
   String _region = 'ZA';
-  final Set<int> _saved = <int>{};
+  Set<String> _services = <String>{'Netflix', 'Prime Video', 'Max', 'Showmax'};
+  int _maxSeasons = 3;
+  bool _completedOnly = false;
+  Set<int> _saved = <int>{};
+  Set<int> _dismissed = <int>{};
+  Set<int> _watched = <int>{};
+  Map<String, int> _feedbackCounts = <String, int>{};
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPersonalization();
+  }
+
+  Future<void> _loadPersonalization() async {
+    final snapshot = await _personalization.load();
+    if (!mounted) return;
+    setState(() {
+      _region = snapshot.region;
+      _services = snapshot.services;
+      _maxSeasons = snapshot.maxSeasons;
+      _completedOnly = snapshot.completedOnly;
+      _saved = snapshot.savedIds;
+      _dismissed = snapshot.dismissedIds;
+      _watched = snapshot.watchedIds;
+      _feedbackCounts = snapshot.feedbackCounts;
+      _loadingProfile = false;
+    });
+  }
+
+  Future<void> _persistPreferences() => _personalization.savePreferences(
+        region: _region,
+        services: _services,
+        maxSeasons: _maxSeasons,
+        completedOnly: _completedOnly,
+      );
 
   void _toggleSaved(int id) {
     setState(() {
       if (!_saved.add(id)) _saved.remove(id);
     });
+    _personalization.saveSavedIds(_saved);
+  }
+
+  Future<void> _recordLocalFeedback(int showId, String reason) async {
+    await _personalization.recordFeedback(showId: showId, reason: reason);
+    await _loadPersonalization();
+  }
+
+  Future<void> _resetPersonalization() async {
+    await _personalization.reset();
+    await _loadPersonalization();
   }
 
   @override
@@ -80,14 +129,45 @@ class _AppShellState extends State<AppShell> {
       DiscoverPage(
         saved: _saved,
         region: _region,
+        services: _services,
+        maxSeasons: _maxSeasons,
+        completedOnly: _completedOnly,
+        excludedIds: {..._dismissed, ..._watched},
         onToggleSaved: _toggleSaved,
+        onFeedback: _recordLocalFeedback,
       ),
       WatchlistPage(saved: _saved, onToggleSaved: _toggleSaved),
       ProfilePage(
         region: _region,
-        onRegionChanged: (value) => setState(() => _region = value),
+        services: _services,
+        maxSeasons: _maxSeasons,
+        completedOnly: _completedOnly,
+        watchedCount: _watched.length,
+        dismissedCount: _dismissed.length,
+        feedbackCounts: _feedbackCounts,
+        onRegionChanged: (value) {
+          setState(() => _region = value);
+          _persistPreferences();
+        },
+        onServicesChanged: (value) {
+          setState(() => _services = value);
+          _persistPreferences();
+        },
+        onMaxSeasonsChanged: (value) {
+          setState(() => _maxSeasons = value);
+          _persistPreferences();
+        },
+        onCompletedOnlyChanged: (value) {
+          setState(() => _completedOnly = value);
+          _persistPreferences();
+        },
+        onReset: _resetPersonalization,
       ),
     ];
+
+    if (_loadingProfile) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
 
     return Scaffold(
       body: IndexedStack(index: _index, children: pages),
@@ -132,13 +212,23 @@ class DiscoverPage extends StatefulWidget {
   const DiscoverPage({
     required this.saved,
     required this.region,
+    required this.services,
+    required this.maxSeasons,
+    required this.completedOnly,
+    required this.excludedIds,
     required this.onToggleSaved,
+    required this.onFeedback,
     super.key,
   });
 
   final Set<int> saved;
   final String region;
+  final Set<String> services;
+  final int maxSeasons;
+  final bool completedOnly;
+  final Set<int> excludedIds;
   final ValueChanged<int> onToggleSaved;
+  final Future<void> Function(int showId, String reason) onFeedback;
 
   @override
   State<DiscoverPage> createState() => _DiscoverPageState();
@@ -208,7 +298,14 @@ class _DiscoverPageState extends State<DiscoverPage> {
     });
 
     try {
-      final recommendation = await _api.recommendFromPrompt(query: query);
+      final recommendation = await _api.recommendFromPrompt(
+        query: query,
+        region: widget.region,
+        services: widget.services,
+        maxSeasons: widget.maxSeasons,
+        completedOnly: widget.completedOnly,
+        excludedIds: widget.excludedIds,
+      );
       if (!mounted) return;
       setState(() {
         _results = recommendation.shows;
@@ -240,7 +337,14 @@ class _DiscoverPageState extends State<DiscoverPage> {
     });
 
     try {
-      final recommendation = await _api.recommendFromMood(mood: mood.keyName);
+      final recommendation = await _api.recommendFromMood(
+        mood: mood.keyName,
+        region: widget.region,
+        services: widget.services,
+        maxSeasons: widget.maxSeasons,
+        completedOnly: widget.completedOnly,
+        excludedIds: widget.excludedIds,
+      );
       if (!mounted) return;
       setState(() {
         _results = recommendation.shows;
@@ -621,6 +725,7 @@ class _DiscoverPageState extends State<DiscoverPage> {
                         region: widget.region,
                         saved: widget.saved.contains(show.id),
                         onToggleSaved: () => widget.onToggleSaved(show.id),
+                        onFeedback: (reason) => widget.onFeedback(show.id, reason),
                       ),
                     ),
                   ),
@@ -709,21 +814,15 @@ class _BrandHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Image.asset(
-          'assets/brand/ffs_icon.png',
-          width: 58,
-          height: 58,
-          fit: BoxFit.contain,
-        ),
-        const SizedBox(width: 14),
         Expanded(
           child: Image.asset(
             'assets/brand/forflicksakes_logo_wide.png',
-            height: 44,
+            height: 48,
             alignment: Alignment.centerLeft,
             fit: BoxFit.contain,
           ),
         ),
+        const SizedBox(width: 12),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
           decoration: BoxDecoration(
@@ -734,9 +833,20 @@ class _BrandHeader extends StatelessWidget {
           child: const Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.cloud_done_outlined, size: 16, color: Color(0xFFD7B8FF)),
+              Icon(
+                Icons.cloud_done_outlined,
+                size: 16,
+                color: Color(0xFFD7B8FF),
+              ),
               SizedBox(width: 5),
-              Text('LIVE', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, letterSpacing: 1.1)),
+              Text(
+                'LIVE',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 1.1,
+                ),
+              ),
             ],
           ),
         ),
@@ -824,6 +934,7 @@ class ResultCard extends StatelessWidget {
     required this.region,
     required this.saved,
     required this.onToggleSaved,
+    required this.onFeedback,
     super.key,
   });
 
@@ -831,6 +942,7 @@ class ResultCard extends StatelessWidget {
   final String region;
   final bool saved;
   final VoidCallback onToggleSaved;
+  final Future<void> Function(String reason) onFeedback;
 
   @override
   Widget build(BuildContext context) {
@@ -844,7 +956,13 @@ class ResultCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(26),
           onTap: () => Navigator.of(context).push(
             MaterialPageRoute<void>(
-              builder: (_) => ShowDetailPage(show: show, region: region, saved: saved, onToggleSaved: onToggleSaved),
+              builder: (_) => ShowDetailPage(
+                show: show,
+                region: region,
+                saved: saved,
+                onToggleSaved: onToggleSaved,
+                onLocalFeedback: onFeedback,
+              ),
             ),
           ),
           child: Container(
@@ -953,6 +1071,7 @@ class ShowDetailPage extends StatefulWidget {
     required this.region,
     required this.saved,
     required this.onToggleSaved,
+    required this.onLocalFeedback,
     super.key,
   });
 
@@ -960,6 +1079,7 @@ class ShowDetailPage extends StatefulWidget {
   final String region;
   final bool saved;
   final VoidCallback onToggleSaved;
+  final Future<void> Function(String reason) onLocalFeedback;
 
   @override
   State<ShowDetailPage> createState() => _ShowDetailPageState();
@@ -980,6 +1100,7 @@ class _ShowDetailPageState extends State<ShowDetailPage> {
 
   Future<void> _sendShowFeedback(String reason) async {
     try {
+      await widget.onLocalFeedback(reason);
       await _api.sendFeedback(
         type: 'show',
         reason: reason,
@@ -1435,140 +1556,166 @@ class WatchlistPage extends StatelessWidget {
   }
 }
 
-class ProfilePage extends StatefulWidget {
+class ProfilePage extends StatelessWidget {
   const ProfilePage({
     required this.region,
+    required this.services,
+    required this.maxSeasons,
+    required this.completedOnly,
+    required this.watchedCount,
+    required this.dismissedCount,
+    required this.feedbackCounts,
     required this.onRegionChanged,
+    required this.onServicesChanged,
+    required this.onMaxSeasonsChanged,
+    required this.onCompletedOnlyChanged,
+    required this.onReset,
     super.key,
   });
 
   final String region;
+  final Set<String> services;
+  final int maxSeasons;
+  final bool completedOnly;
+  final int watchedCount;
+  final int dismissedCount;
+  final Map<String, int> feedbackCounts;
   final ValueChanged<String> onRegionChanged;
+  final ValueChanged<Set<String>> onServicesChanged;
+  final ValueChanged<int> onMaxSeasonsChanged;
+  final ValueChanged<bool> onCompletedOnlyChanged;
+  final Future<void> Function() onReset;
 
-  @override
-  State<ProfilePage> createState() => _ProfilePageState();
-}
-
-class _ProfilePageState extends State<ProfilePage> {
-  static const services = <String>[
-    'Netflix',
-    'Prime Video',
-    'Apple TV+',
-    'Disney+',
-    'Max',
-    'Showmax',
-    'DStv Stream',
+  static const serviceOptions = <String>[
+    'Netflix', 'Prime Video', 'Apple TV+', 'Disney+', 'Max', 'Showmax', 'DStv Stream',
   ];
 
   static const regions = <String, String>{
-    'ZA': 'South Africa',
-    'PT': 'Portugal',
-    'GB': 'United Kingdom',
-    'US': 'United States',
-    'IE': 'Ireland',
-    'ES': 'Spain',
-    'FR': 'France',
-    'DE': 'Germany',
-    'AU': 'Australia',
-    'NZ': 'New Zealand',
+    'ZA': 'South Africa', 'PT': 'Portugal', 'GB': 'United Kingdom', 'US': 'United States',
+    'IE': 'Ireland', 'ES': 'Spain', 'FR': 'France', 'DE': 'Germany', 'AU': 'Australia', 'NZ': 'New Zealand',
   };
-
-  final Set<String> _selectedServices = <String>{
-    'Netflix',
-    'Prime Video',
-    'Max',
-    'Showmax',
-  };
-  double _maximumSeasons = 3;
-  bool _completedOnly = false;
 
   @override
   Widget build(BuildContext context) {
+    final topFeedback = feedbackCounts.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
     return SafeArea(
       child: ListView(
         padding: const EdgeInsets.fromLTRB(24, 28, 24, 110),
         children: [
-          Text('Profile', style: Theme.of(context).textTheme.headlineLarge),
+          Text('Profile & taste', style: Theme.of(context).textTheme.headlineLarge),
           const SizedBox(height: 8),
-          const Text('Shape recommendations around your viewing setup.'),
-          const SizedBox(height: 28),
+          const Text('Your choices now stay on this device and shape future recommendations.'),
+          const SizedBox(height: 24),
+          Row(children: [
+            Expanded(child: _TasteStat(label: 'Watched', value: '$watchedCount', icon: Icons.visibility_rounded)),
+            const SizedBox(width: 12),
+            Expanded(child: _TasteStat(label: 'Dismissed', value: '$dismissedCount', icon: Icons.hide_source_rounded)),
+          ]),
+          if (topFeedback.isNotEmpty) ...[
+            const SizedBox(height: 24),
+            Text('What we have learned', style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: topFeedback.take(5).map((entry) => Chip(label: Text('${entry.key} · ${entry.value}'))).toList(),
+            ),
+          ],
+          const SizedBox(height: 30),
           Text('Streaming region', style: Theme.of(context).textTheme.titleLarge),
           const SizedBox(height: 12),
           DropdownButtonFormField<String>(
-            initialValue: widget.region,
-            decoration: const InputDecoration(
-              filled: true,
-              fillColor: Color(0xFF15111D),
-              prefixIcon: Icon(Icons.public_rounded),
-            ),
-            items: regions.entries
-                .map(
-                  (entry) => DropdownMenuItem<String>(
-                    value: entry.key,
-                    child: Text(entry.value),
-                  ),
-                )
-                .toList(),
-            onChanged: (value) {
-              if (value != null) widget.onRegionChanged(value);
-            },
+            initialValue: region,
+            decoration: const InputDecoration(filled: true, fillColor: Color(0xFF15111D), prefixIcon: Icon(Icons.public_rounded)),
+            items: regions.entries.map((entry) => DropdownMenuItem(value: entry.key, child: Text(entry.value))).toList(),
+            onChanged: (value) { if (value != null) onRegionChanged(value); },
           ),
           const SizedBox(height: 30),
           Text('Streaming services', style: Theme.of(context).textTheme.titleLarge),
+          const SizedBox(height: 8),
+          const Text('These choices are saved across restarts.'),
           const SizedBox(height: 14),
           Wrap(
             spacing: 10,
             runSpacing: 12,
-            children: services.map((service) {
-              final selected = _selectedServices.contains(service);
+            children: serviceOptions.map((service) {
+              final selected = services.contains(service);
               return FilterChip(
                 selected: selected,
                 label: Text(service),
                 selectedColor: const Color(0xFF4FD5CB),
-                labelStyle: TextStyle(
-                  color: selected ? const Color(0xFF091310) : Colors.white,
-                ),
+                labelStyle: TextStyle(color: selected ? const Color(0xFF091310) : Colors.white),
                 onSelected: (_) {
-                  setState(() {
-                    if (!_selectedServices.add(service)) {
-                      _selectedServices.remove(service);
-                    }
-                  });
+                  final updated = {...services};
+                  if (!updated.add(service)) updated.remove(service);
+                  onServicesChanged(updated);
                 },
               );
             }).toList(),
           ),
           const SizedBox(height: 30),
-          Text(
-            'Maximum seasons: ${_maximumSeasons.round()}',
-            style: Theme.of(context).textTheme.titleLarge,
-          ),
-          Slider(
-            value: _maximumSeasons,
-            min: 1,
-            max: 10,
-            divisions: 9,
-            onChanged: (value) => setState(() => _maximumSeasons = value),
-          ),
+          Text('Maximum seasons: $maxSeasons', style: Theme.of(context).textTheme.titleLarge),
+          Slider(value: maxSeasons.toDouble(), min: 1, max: 10, divisions: 9, onChanged: (value) => onMaxSeasonsChanged(value.round())),
           SwitchListTile(
             contentPadding: EdgeInsets.zero,
-            value: _completedOnly,
+            value: completedOnly,
             title: const Text('Completed shows only'),
-            subtitle: const Text('Avoid programmes waiting for future seasons.'),
-            onChanged: (value) => setState(() => _completedOnly = value),
+            subtitle: const Text('Apply this preference automatically to prompt and mood recommendations.'),
+            onChanged: onCompletedOnlyChanged,
           ),
-          const Divider(height: 40),
+          const Divider(height: 42),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.restart_alt_rounded),
+            title: const Text('Reset personalisation'),
+            subtitle: const Text('Clear saved preferences, learning, watch history and local watchlist.'),
+            onTap: () async {
+              final confirmed = await showDialog<bool>(
+                context: context,
+                builder: (dialogContext) => AlertDialog(
+                  title: const Text('Reset personalisation?'),
+                  content: const Text('This cannot be undone.'),
+                  actions: [
+                    TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('Cancel')),
+                    FilledButton(onPressed: () => Navigator.pop(dialogContext, true), child: const Text('Reset')),
+                  ],
+                ),
+              );
+              if (confirmed == true) await onReset();
+            },
+          ),
           const ListTile(
             contentPadding: EdgeInsets.zero,
-            leading: Icon(Icons.info_outline_rounded),
-            title: Text('Live data sources'),
-            subtitle: Text(
-              'TVMaze for TV metadata. Watchmode is optional for verified '
-              'streaming links; otherwise a regional viewing search is used.',
-            ),
+            leading: Icon(Icons.lock_outline_rounded),
+            title: Text('Stored locally'),
+            subtitle: Text('Sprint 4 keeps taste data on this device. Cloud sync comes with accounts.'),
           ),
         ],
       ),
     );
   }
+}
+
+class _TasteStat extends StatelessWidget {
+  const _TasteStat({required this.label, required this.value, required this.icon});
+  final String label;
+  final String value;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.all(18),
+    decoration: BoxDecoration(
+      color: const Color(0xFF15111D),
+      borderRadius: BorderRadius.circular(20),
+      border: Border.all(color: const Color(0xFF2B2633)),
+    ),
+    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Icon(icon, color: const Color(0xFFD7B8FF)),
+      const SizedBox(height: 12),
+      Text(value, style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w900)),
+      Text(label, style: const TextStyle(color: Color(0xFF9893A3))),
+    ]),
+  );
 }

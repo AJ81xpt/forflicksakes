@@ -1,7 +1,7 @@
 import 'dotenv/config';
 import cors from 'cors';
 import express from 'express';
-import { knownMoods, moodLabel, parsePrompt as parsePromptV2, scoreMood as scoreMoodV2, scorePrompt as scorePromptV2 } from './recommendation_engine.js';
+import { knownMoods, looksLikeTitleLookup, moodLabel, normalizeTitle, parsePrompt as parsePromptV2, scoreMood as scoreMoodV2, scorePrompt as scorePromptV2 } from './recommendation_engine.js';
 
 const app = express();
 const port = Number(process.env.PORT || 8080);
@@ -469,6 +469,37 @@ async function enrichShowsV2(shows, limit = 32) {
   return enriched;
 }
 
+
+
+async function exactTitleCandidate(query) {
+  if (!looksLikeTitleLookup(query)) return null;
+  let searchResults;
+  try {
+    searchResults = await tvMazeSearch(query);
+  } catch {
+    return null;
+  }
+
+  const wanted = normalizeTitle(query);
+  const match = searchResults
+    .map((item) => item?.show)
+    .filter(Boolean)
+    .find((show) => normalizeTitle(show.name) === wanted);
+
+  if (!match) return null;
+  let show = match;
+  try {
+    show = await tvMazeShow(match.id);
+  } catch {
+    // The search payload is still enough to display a useful result.
+  }
+  return {
+    show,
+    score: 100,
+    reasons: ['Exact title match'],
+  };
+}
+
 async function promptCandidatesV2(query, intent) {
   const catalogue = await catalogueShows();
   const pool = new Map(catalogue.map((show) => [show.id, show]));
@@ -555,9 +586,15 @@ app.post('/recommendations', async (request, response) => {
       if (query.length < 3) {
         return response.status(400).json({ error: 'Describe what you want to watch.' });
       }
-      const parsed = await enrichReferenceV2(parsePromptV2(query));
-      interpretation = parsed.labels;
-      candidates = await promptCandidatesV2(query, parsed);
+      const exact = await exactTitleCandidate(query);
+      if (exact) {
+        interpretation = [`Exact title: ${exact.show.name}`];
+        candidates = [exact];
+      } else {
+        const parsed = await enrichReferenceV2(parsePromptV2(query));
+        interpretation = parsed.labels;
+        candidates = await promptCandidatesV2(query, parsed);
+      }
     }
 
     response.json({
