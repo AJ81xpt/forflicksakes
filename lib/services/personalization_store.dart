@@ -14,6 +14,7 @@ class PersonalizationSnapshot {
     required this.watchedIds,
     required this.feedbackCounts,
     required this.knownShows,
+    required this.appLanguage,
   });
 
   final String region;
@@ -25,6 +26,7 @@ class PersonalizationSnapshot {
   final Set<int> watchedIds;
   final Map<String, int> feedbackCounts;
   final Map<int, ShowItem> knownShows;
+  final String appLanguage;
 
   factory PersonalizationSnapshot.defaults() => const PersonalizationSnapshot(
         region: 'ZA',
@@ -36,6 +38,7 @@ class PersonalizationSnapshot {
         watchedIds: <int>{},
         feedbackCounts: <String, int>{},
         knownShows: <int, ShowItem>{},
+        appLanguage: 'en',
       );
 }
 
@@ -49,6 +52,7 @@ class PersonalizationStore {
   static const _watchedIdsKey = 'ffs_watched_ids';
   static const _feedbackKey = 'ffs_feedback_counts';
   static const _knownShowsKey = 'ffs_known_shows';
+  static const _appLanguageKey = 'ffs_app_language';
 
   Future<PersonalizationSnapshot> load() async {
     final prefs = await SharedPreferences.getInstance();
@@ -63,6 +67,7 @@ class PersonalizationStore {
       watchedIds: _decodeIds(prefs.getStringList(_watchedIdsKey)),
       feedbackCounts: _decodeFeedback(prefs.getString(_feedbackKey)),
       knownShows: _decodeShows(prefs.getString(_knownShowsKey)),
+      appLanguage: prefs.getString(_appLanguageKey) ?? defaults.appLanguage,
     );
   }
 
@@ -128,6 +133,11 @@ class PersonalizationStore {
     ]);
   }
 
+  Future<void> saveAppLanguage(String languageCode) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_appLanguageKey, languageCode);
+  }
+
   Future<void> reset() async {
     final prefs = await SharedPreferences.getInstance();
     for (final key in <String>[
@@ -140,6 +150,7 @@ class PersonalizationStore {
       _watchedIdsKey,
       _feedbackKey,
       _knownShowsKey,
+      _appLanguageKey,
     ]) {
       await prefs.remove(key);
     }
