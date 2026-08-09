@@ -75,6 +75,79 @@ const genericQueryWords = new Set([
   'episodes', 'popular', 'good', 'great', 'really', 'very', 'under', 'than',
 ]);
 
+
+const availabilityCache = new Map();
+const AVAILABILITY_TTL_MS = 48 * 60 * 60 * 1000;
+
+const SUPPORTED_AVAILABILITY_REGIONS = new Set([
+  'ZA', 'GB', 'US',
+  'AT', 'BE', 'BG', 'HR', 'CY', 'CZ', 'DK', 'EE', 'FI', 'FR', 'DE', 'GR',
+  'HU', 'IE', 'IT', 'LV', 'LT', 'LU', 'MT', 'NL', 'PL', 'PT', 'RO', 'SK',
+  'SI', 'ES', 'SE'
+]);
+
+function normalizeProviderName(name = '') {
+  const value = String(name).trim();
+  if (!value) return value;
+  const lower = value.toLowerCase();
+  if (lower === 'max' || lower === 'hbo max') return 'HBO Max';
+  if (lower === 'amazon prime video' || lower === 'prime video') return 'Prime Video';
+  if (lower === 'apple tv plus' || lower === 'apple tv+') return 'Apple TV+';
+  return value;
+}
+
+function availabilityCacheKey(showId, region) {
+  return `${showId}:${region}`;
+}
+
+function readAvailabilityCache(showId, region) {
+  const entry = availabilityCache.get(availabilityCacheKey(showId, region));
+  if (!entry) return null;
+  if (entry.expiresAt <= Date.now()) {
+    availabilityCache.delete(availabilityCacheKey(showId, region));
+    return null;
+  }
+  return entry.value;
+}
+
+function writeAvailabilityCache(showId, region, value) {
+  availabilityCache.set(availabilityCacheKey(showId, region), {
+    expiresAt: Date.now() + AVAILABILITY_TTL_MS,
+    value,
+  });
+  return value;
+}
+
+async function resolveAvailability({ showId, region }) {
+  const normalizedRegion = String(region || '').toUpperCase();
+  const cached = readAvailabilityCache(showId, normalizedRegion);
+  if (cached) return { ...cached, cached: true };
+
+  if (!SUPPORTED_AVAILABILITY_REGIONS.has(normalizedRegion)) {
+    return writeAvailabilityCache(showId, normalizedRegion, {
+      region: normalizedRegion,
+      checkedAt: new Date().toISOString(),
+      status: 'unsupported-region',
+      verified: false,
+      providers: [],
+      attribution: 'ForFlickSakes availability resolver',
+      message: 'Streaming availability is not yet supported for this region.',
+      evidence: [],
+    });
+  }
+
+  return writeAvailabilityCache(showId, normalizedRegion, {
+    region: normalizedRegion,
+    checkedAt: new Date().toISOString(),
+    status: 'unconfirmed',
+    verified: false,
+    providers: [],
+    attribution: 'ForFlickSakes availability resolver',
+    message: 'Availability could not be legally verified from a free permitted source yet.',
+    evidence: [],
+  });
+}
+
 let catalogueCache = { expiresAt: 0, shows: [] };
 const feedbackEvents = [];
 
@@ -669,46 +742,27 @@ app.get('/shows/:id/details', async (request, response) => {
   }
 });
 
-app.get('/shows/:id/providers', async (request, response) => {
+app.get('/shows/:id/providers', async (req, res) => {
   try {
-    const region = String(request.query.region || 'ZA').toUpperCase();
-    const show = await tvMazeShow(request.params.id);
-
-    if (!watchmodeKey) {
-      return response.json({
-        verified: false,
-        providers: [],
-        attribution: 'TV metadata by TVMaze.',
-        message: 'Verified streaming availability is not configured yet.',
-      });
+    const showId = Number(req.params.id);
+    const region = String(req.query.region || 'ZA').toUpperCase();
+    if (!Number.isFinite(showId) || showId <= 0) {
+      return res.status(400).json({ error: 'Invalid show id.' });
     }
-
-    const watchmodeId = await watchmodeTitleId(show.externals?.imdb, show.name);
-    const sources = await watchmodeSources(watchmodeId, region);
-    const providers = sources
-      .filter((source) => source?.name && (source?.web_url || source?.ios_url || source?.android_url))
-      .map((source) => ({
-        name: normalizeProviderName(source.name),
-        type: source.type || 'stream',
-        webUrl: source.web_url || null,
-        iosUrl: source.ios_url || null,
-        androidUrl: source.android_url || null,
-        format: source.format || null,
-        price: source.price ?? null,
-      }))
-      .filter((provider, index, all) =>
-        all.findIndex((candidate) => candidate.name === provider.name && candidate.type === provider.type) === index,
-      );
-
-    response.json({
-      verified: providers.length > 0,
-      providers,
-      attribution: 'Streaming availability and links by Watchmode.',
-      message: providers.length ? null : `No verified streaming option was returned for ${region}.`,
-    });
+    const result = await resolveAvailability({ showId, region });
+    return res.json(result);
   } catch (error) {
-    console.error(error);
-    response.status(502).json({ error: 'Provider lookup failed.' });
+    console.error('Availability resolver failed:', error);
+    return res.status(500).json({
+      region: String(req.query.region || 'ZA').toUpperCase(),
+      checkedAt: new Date().toISOString(),
+      status: 'error',
+      verified: false,
+      providers: [],
+      attribution: 'ForFlickSakes availability resolver',
+      message: 'Availability check failed.',
+      evidence: [],
+    });
   }
 });
 

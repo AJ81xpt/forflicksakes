@@ -2195,6 +2195,8 @@ class ProfilePage extends StatelessWidget {
           ],
           const SizedBox(height: 30),
           Text('Streaming region', style: Theme.of(context).textTheme.titleLarge),
+          const SizedBox(height: 6),
+          const Text('Availability resolver covers South Africa, the UK, the US and EU countries individually.', style: TextStyle(color: Color(0xFF9893A3))),
           const SizedBox(height: 12),
           DropdownButtonFormField<String>(
             initialValue: region,
@@ -2236,55 +2238,6 @@ class ProfilePage extends StatelessWidget {
             onChanged: onCompletedOnlyChanged,
           ),
           const Divider(height: 42),
-          Text('Beta & privacy', style: Theme.of(context).textTheme.titleLarge),
-          const SizedBox(height: 8),
-          const Text('ForFlickSakes beta · version 1.0.0 (1)', style: TextStyle(color: Color(0xFF9893A3))),
-          const SizedBox(height: 8),
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: const Icon(Icons.bug_report_outlined),
-            title: const Text('Send beta feedback'),
-            subtitle: const Text('Tell us what worked, what felt wrong, or what you expected instead.'),
-            trailing: const Icon(Icons.chevron_right_rounded),
-            onTap: () => _showBetaFeedback(context),
-          ),
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: const Icon(Icons.privacy_tip_outlined),
-            title: const Text('Privacy'),
-            subtitle: const Text('What is stored on this device during beta.'),
-            trailing: const Icon(Icons.chevron_right_rounded),
-            onTap: () => _showInfoPage(
-              context,
-              title: 'Privacy',
-              body: 'ForFlickSakes currently stores your streaming preferences, saved titles, watched/dismissed signals and recommendation feedback locally on this device. Recommendation requests are sent to the ForFlickSakes backend so the concierge can return results. This beta does not provide account or cloud sync yet. Before public release, this in-app summary should be replaced or linked to the final published privacy policy.',
-            ),
-          ),
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: const Icon(Icons.description_outlined),
-            title: const Text('Beta terms'),
-            subtitle: const Text('Important notes for this pre-release build.'),
-            trailing: const Icon(Icons.chevron_right_rounded),
-            onTap: () => _showInfoPage(
-              context,
-              title: 'Beta terms',
-              body: 'This is a pre-release test build. Catalogue metadata, streaming availability and recommendation quality may be incomplete or change. Always confirm availability with the streaming provider. This screen is a beta notice, not a substitute for the final legal terms required before public distribution.',
-            ),
-          ),
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: const Icon(Icons.info_outline_rounded),
-            title: const Text('About ForFlickSakes'),
-            subtitle: const Text('Stop scrolling. Start watching.'),
-            trailing: const Icon(Icons.chevron_right_rounded),
-            onTap: () => _showInfoPage(
-              context,
-              title: 'ForFlickSakes',
-              body: 'Your Watch Concierge.\n\nFOR FLICK SAKES.\n\nStop scrolling. Start watching.\n\nForFlickSakes helps you turn a mood, a constraint or a show you already love into a small set of confident things to watch next.',
-            ),
-          ),
-          const Divider(height: 42),
           ListTile(
             contentPadding: EdgeInsets.zero,
             leading: const Icon(Icons.restart_alt_rounded),
@@ -2309,87 +2262,12 @@ class ProfilePage extends StatelessWidget {
             contentPadding: EdgeInsets.zero,
             leading: Icon(Icons.lock_outline_rounded),
             title: Text('Stored locally'),
-            subtitle: Text('Taste data is stored on this device during beta. Cloud sync can come with accounts later.'),
+            subtitle: Text('Sprint 4 keeps taste data on this device. Cloud sync comes with accounts.'),
           ),
         ],
       ),
     );
   }
-}
-
-
-void _showInfoPage(BuildContext context, {required String title, required String body}) {
-  Navigator.of(context).push(
-    MaterialPageRoute<void>(
-      builder: (context) => Scaffold(
-        appBar: AppBar(title: Text(title)),
-        body: SafeArea(
-          child: ListView(
-            padding: const EdgeInsets.all(24),
-            children: [
-              Text(title, style: Theme.of(context).textTheme.headlineSmall),
-              const SizedBox(height: 18),
-              Text(body, style: const TextStyle(fontSize: 16, height: 1.55, color: Color(0xFFB7B2C0))),
-            ],
-          ),
-        ),
-      ),
-    ),
-  );
-}
-
-Future<void> _showBetaFeedback(BuildContext context) async {
-  final controller = TextEditingController();
-  await showModalBottomSheet<void>(
-    context: context,
-    isScrollControlled: true,
-    showDragHandle: true,
-    backgroundColor: const Color(0xFF15111D),
-    builder: (sheetContext) => Padding(
-      padding: EdgeInsets.fromLTRB(
-        24,
-        4,
-        24,
-        MediaQuery.viewInsetsOf(sheetContext).bottom + 24,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('Beta feedback', style: Theme.of(sheetContext).textTheme.headlineSmall),
-          const SizedBox(height: 8),
-          const Text('For now this captures your note so you can copy it into the beta report channel. Direct submission comes when the production feedback service is connected.'),
-          const SizedBox(height: 16),
-          TextField(
-            controller: controller,
-            minLines: 4,
-            maxLines: 7,
-            autofocus: true,
-            decoration: const InputDecoration(
-              hintText: 'What happened? What did you expect?',
-              filled: true,
-              fillColor: Color(0xFF100817),
-            ),
-          ),
-          const SizedBox(height: 16),
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton.icon(
-              onPressed: () {
-                Navigator.pop(sheetContext);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Thanks — beta feedback entry is ready for production wiring.')),
-                );
-              },
-              icon: const Icon(Icons.check_rounded),
-              label: const Text('Done'),
-            ),
-          ),
-        ],
-      ),
-    ),
-  );
-  controller.dispose();
 }
 
 class _TasteStat extends StatelessWidget {

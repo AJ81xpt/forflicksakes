@@ -112,12 +112,16 @@ class WatchOptions {
     required this.verified,
     required this.attribution,
     this.message,
+    this.status = 'unconfirmed',
+    this.checkedAt,
   });
 
   final List<WatchProvider> providers;
   final bool verified;
   final String attribution;
   final String? message;
+  final String status;
+  final String? checkedAt;
 
   factory WatchOptions.fromJson(Map<String, dynamic> json) {
     return WatchOptions(
@@ -128,6 +132,8 @@ class WatchOptions {
       verified: json['verified'] as bool? ?? false,
       attribution: json['attribution'] as String? ?? '',
       message: json['message'] as String?,
+      status: json['status'] as String? ?? 'unconfirmed',
+      checkedAt: json['checkedAt'] as String?,
     );
   }
 }
