@@ -1,7 +1,7 @@
 import 'dotenv/config';
 import cors from 'cors';
 import express from 'express';
-import { knownMoods, looksLikeTitleLookup, moodLabel, normalizeTitle, parsePrompt as parsePromptV2, scoreMood as scoreMoodV2, scorePrompt as scorePromptV2 } from './recommendation_engine.js';
+import { knownMoods, looksLikeTitleLookup, moodLabel, normalizeTitle, parsePrompt as parsePromptV2, scoreMood as scoreMoodV2, scorePrompt as scorePromptV2, showProfile as showProfileV2 } from './recommendation_engine.js';
 
 const app = express();
 const port = Number(process.env.PORT || 8080);
@@ -95,6 +95,10 @@ async function tvMazeSearch(query) {
 
 async function tvMazeShow(id) {
   return tvMazeJson(`https://api.tvmaze.com/shows/${id}?embed=seasons`);
+}
+
+async function tvMazeShowDetails(id) {
+  return tvMazeJson(`https://api.tvmaze.com/shows/${id}?embed[]=seasons&embed[]=cast&embed[]=episodes`);
 }
 
 async function catalogueShows() {
@@ -445,6 +449,7 @@ async function enrichReferenceV2(intent) {
     if (reference) {
       intent.referenceName = reference.name;
       intent.referenceGenres = Array.isArray(reference.genres) ? reference.genres : [];
+      intent.referenceProfile = showProfileV2(reference);
       intent.labels = intent.labels.map((label) =>
         label.startsWith('Similar to ') ? `Similar to ${reference.name}` : label,
       );
@@ -634,6 +639,35 @@ app.post('/feedback', (request, response) => {
 function normalizeProviderName(name) {
   return name === 'Max' ? 'HBO Max' : name;
 }
+
+
+app.get('/shows/:id/details', async (request, response) => {
+  try {
+    const show = await tvMazeShowDetails(request.params.id);
+    const cast = Array.isArray(show?._embedded?.cast)
+      ? show._embedded.cast.slice(0, 12).map((entry) => ({
+          name: entry?.person?.name || '',
+          character: entry?.character?.name || '',
+          imageUrl: entry?.person?.image?.medium || entry?.person?.image?.original || '',
+        })).filter((entry) => entry.name)
+      : [];
+    const episodes = Array.isArray(show?._embedded?.episodes) ? show._embedded.episodes : [];
+    const network = show?.webChannel?.name || show?.network?.name || '';
+
+    response.json({
+      language: show?.language || '',
+      type: show?.type || '',
+      network,
+      premiered: show?.premiered || '',
+      ended: show?.ended || '',
+      episodeCount: episodes.length,
+      cast,
+    });
+  } catch (error) {
+    console.error(error);
+    response.status(502).json({ error: 'Show details lookup failed.' });
+  }
+});
 
 app.get('/shows/:id/providers', async (request, response) => {
   try {

@@ -49,6 +49,7 @@ const GENRE_ALIASES = {
   crime: ['Crime'],
   comedy: ['Comedy'],
   funny: ['Comedy'],
+  funnier: ['Comedy'],
   sitcom: ['Comedy'],
   romance: ['Romance'],
   romantic: ['Romance'],
@@ -119,9 +120,10 @@ const THEME_RULES = {
   psychological: /\b(?:psychological|mind games?|identity|obsession|paranoia)\b/i,
   slowBurn: /\b(?:slow[- ]burn|patient|atmospheric|meditative)\b/i,
   fastPaced: /\b(?:fast[- ]paced|quick|propulsive|nonstop|high[- ]energy)\b/i,
+  gripping: /\b(?:gripping|suspenseful|tense|edge of (?:my|your) seat)\b/i,
   light: /\b(?:light|lighter|easy watch|comforting)\b/i,
   feelGood: /\b(?:happy|happier|cheerful|joyful|feel[- ]good|uplifting|positive|lighthearted|heartwarming)\b/i,
-  dark: /\b(?:dark|bleak|grim|disturbing|unsettling)\b/i,
+  dark: /(?<!not )(?:\bdark\b|\bbleak\b|\bgrim\b|\bdisturbing\b|\bunsettling\b)/i,
 };
 
 export function parsePrompt(query) {
@@ -168,7 +170,11 @@ export function parsePrompt(query) {
     if (pattern.test(raw)) themes.push(name);
   }
 
-  if (/\b(?:not too dark|nothing bleak|not bleak)\b/i.test(raw)) exclusions.push('dark');
+  if (/\b(?:not too dark|less dark|lighter|nothing bleak|not bleak|less depressing|not depressing)\b/i.test(raw)) exclusions.push('dark');
+  if (exclusions.includes('dark')) {
+    const darkIndex = themes.indexOf('dark');
+    if (darkIndex >= 0) themes.splice(darkIndex, 1);
+  }
   if (/\b(?:no|not|without|avoid)\s+(?:too\s+much\s+)?(?:violence|violent|gore)\b/i.test(raw)) exclusions.push('violence');
   if (/\b(?:not slow|avoid slow|fast[- ]paced)\b/i.test(raw)) exclusions.push('slow');
 
@@ -266,6 +272,7 @@ function themeScore(profile, themes) {
     if (theme === 'light') score += profile.attributes.comfort * 2 - profile.attributes.darkness;
     if (theme === 'feelGood') score += profile.attributes.comfort * 3 + profile.attributes.humour - profile.attributes.darkness * 2;
     if (theme === 'dark') score += profile.attributes.darkness * 2;
+    if (theme === 'gripping') score += profile.attributes.intensity * 3;
   }
   return score;
 }
@@ -283,6 +290,13 @@ export function scorePrompt(show, query, intent) {
   if (intent.maxSeasons && p.seasons <= intent.maxSeasons) score += 5;
   if (intent.maxRuntime && p.runtime <= intent.maxRuntime) score += 5;
   for (const genre of intent.referenceGenres || []) if (genreMatches(p, genre)) score += 6;
+  if (intent.referenceProfile?.attributes) {
+    const reference = intent.referenceProfile.attributes;
+    const current = p.attributes;
+    const similarity = ['humour', 'darkness', 'complexity', 'comfort', 'intensity', 'pace']
+      .reduce((total, key) => total + Math.max(0, 5 - Math.abs((reference[key] || 0) - (current[key] || 0))), 0);
+    score += similarity * 0.8;
+  }
 
   const intentWords = new Set([
     'happy', 'happier', 'cheerful', 'joyful', 'feel-good', 'uplifting',
@@ -304,6 +318,7 @@ export function scorePrompt(show, query, intent) {
   if (intent.maxSeasons) reasons.push(`${p.seasons} seasons — within your limit`);
   if (intent.maxRuntime) reasons.push(`${p.runtime}-minute episodes — within your limit`);
   if (intent.referenceGenres?.length) reasons.push(`Shares genres with ${intent.referenceName || intent.referenceTitle}`);
+  if (intent.referenceProfile?.attributes) reasons.push(`Similar tone and intensity to ${intent.referenceName || intent.referenceTitle}`);
   if (intent.themes.includes('twisty') && p.attributes.complexity >= 3) reasons.push('Twisty, puzzle-led storytelling');
   if (intent.themes.includes('light') && p.attributes.comfort >= 3) reasons.push('Lighter, more comforting tone');
   if (intent.themes.includes('feelGood') && p.attributes.comfort >= 2) reasons.push('Warm, upbeat feel-good tone');

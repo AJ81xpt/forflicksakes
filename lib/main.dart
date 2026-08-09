@@ -149,6 +149,19 @@ class _AppShellState extends State<AppShell> {
         onFeedback: _recordLocalFeedback,
         onShowsSeen: _rememberShows,
       ),
+      ForYouPage(
+        saved: _saved,
+        watched: _watched,
+        dismissed: _dismissed,
+        knownShows: _knownShows,
+        region: _region,
+        services: _services,
+        maxSeasons: _maxSeasons,
+        completedOnly: _completedOnly,
+        onToggleSaved: _toggleSaved,
+        onFeedback: _recordLocalFeedback,
+        onShowsSeen: _rememberShows,
+      ),
       WatchlistPage(
         saved: _saved,
         knownShows: _knownShows,
@@ -208,6 +221,11 @@ class _AppShellState extends State<AppShell> {
                 icon: Icon(Icons.auto_awesome_outlined),
                 selectedIcon: Icon(Icons.auto_awesome_rounded),
                 label: 'Discover',
+              ),
+              NavigationDestination(
+                icon: Icon(Icons.favorite_outline_rounded),
+                selectedIcon: Icon(Icons.favorite_rounded),
+                label: 'For You',
               ),
               NavigationDestination(
                 icon: Icon(Icons.bookmark_border_rounded),
@@ -384,6 +402,13 @@ class _DiscoverPageState extends State<DiscoverPage> {
         _error = error.toString().replaceFirst('Exception: ', '');
       });
     }
+  }
+
+  Future<void> _refinePrompt(String instruction) async {
+    final base = _lastQuery.trim().isEmpty ? _controller.text.trim() : _lastQuery.trim();
+    if (base.isEmpty || _loading) return;
+    _controller.text = '$base, $instruction';
+    await _findFromPrompt();
   }
 
   void _openMoodBrowser() {
@@ -691,7 +716,7 @@ class _DiscoverPageState extends State<DiscoverPage> {
                             Text(
                               _resultMode == 'mood'
                                   ? 'Browsing by mood'
-                                  : 'Requirements applied',
+                                  : "Here's what I understood",
                               style: const TextStyle(fontWeight: FontWeight.w800),
                             ),
                           ],
@@ -713,6 +738,27 @@ class _DiscoverPageState extends State<DiscoverPage> {
                         ),
                       ],
                     ),
+                  ),
+                ],
+                if (_resultMode == 'prompt' && _results.isNotEmpty) ...[
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      const Text('Not quite?', style: TextStyle(fontWeight: FontWeight.w800)),
+                      const SizedBox(width: 8),
+                      Text('Refine without starting over', style: Theme.of(context).textTheme.bodyMedium),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      ActionChip(label: const Text('Funnier'), onPressed: _loading ? null : () => _refinePrompt('make it funnier')),
+                      ActionChip(label: const Text('Less dark'), onPressed: _loading ? null : () => _refinePrompt('less dark and nothing bleak')),
+                      ActionChip(label: const Text('Shorter'), onPressed: _loading ? null : () => _refinePrompt('short episodes, under 35 minutes')),
+                      ActionChip(label: const Text('More gripping'), onPressed: _loading ? null : () => _refinePrompt('more gripping and suspenseful')),
+                    ],
                   ),
                 ],
                 if (_error != null) ...[
@@ -939,7 +985,17 @@ class _ConciergePanel extends StatelessWidget {
                   ),
                 ],
               ),
-              SizedBox(height: 25),
+              SizedBox(height: 18),
+              Text(
+                'FOR FLICK SAKES.',
+                style: TextStyle(
+                  color: Color(0xFFD7B8FF),
+                  fontSize: 17,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 1.4,
+                ),
+              ),
+              SizedBox(height: 12),
               Text(
                 'Stop scrolling.\nStart watching.',
                 style: TextStyle(
@@ -1124,48 +1180,63 @@ class _ShowDetailPageState extends State<ShowDetailPage> {
   final ApiService _api = ApiService();
   late bool _saved = widget.saved;
   WatchOptions? _options;
+  ShowDetails? _details;
   bool _loadingOptions = true;
+  bool _loadingDetails = true;
   String? _optionsError;
+  String? _detailsError;
+  List<ShowItem> _vibeResults = const <ShowItem>[];
+  bool _loadingVibe = false;
+  String _vibeMode = 'same';
+  String? _vibeError;
 
   @override
   void initState() {
     super.initState();
     _loadOptions();
+    _loadDetails();
   }
 
   Future<void> _sendShowFeedback(String reason) async {
     try {
       await widget.onLocalFeedback(reason);
-      await _api.sendFeedback(
-        type: 'show',
-        reason: reason,
-        showId: widget.show.id,
-      );
+      await _api.sendFeedback(type: 'show', reason: reason, showId: widget.show.id);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Saved: $reason')),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Saved: $reason')));
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Feedback could not be saved.')),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Feedback could not be saved.')));
+    }
+  }
+
+  Future<void> _loadDetails() async {
+    setState(() {
+      _loadingDetails = true;
+      _detailsError = null;
+    });
+    try {
+      final details = await _api.showDetails(showId: widget.show.id);
+      if (!mounted) return;
+      setState(() {
+        _details = details;
+        _loadingDetails = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _loadingDetails = false;
+        _detailsError = 'Extra show details could not be loaded.';
+      });
     }
   }
 
   Future<void> _loadOptions() async {
-    if (mounted) {
-      setState(() {
-        _loadingOptions = true;
-        _optionsError = null;
-      });
-    }
-
+    setState(() {
+      _loadingOptions = true;
+      _optionsError = null;
+    });
     try {
-      final options = await _api.watchOptions(
-        showId: widget.show.id,
-        region: widget.region,
-      );
+      final options = await _api.watchOptions(showId: widget.show.id, region: widget.region);
       if (!mounted) return;
       setState(() {
         _options = options;
@@ -1180,6 +1251,47 @@ class _ShowDetailPageState extends State<ShowDetailPage> {
     }
   }
 
+  Future<void> _continueVibe(String mode) async {
+    setState(() {
+      _loadingVibe = true;
+      _vibeMode = mode;
+      _vibeError = null;
+    });
+    try {
+      final result = await _api.continueTheVibe(
+        title: widget.show.title,
+        refinement: mode,
+        region: widget.region,
+      );
+      if (!mounted) return;
+      setState(() {
+        _vibeResults = result.shows.where((item) => item.id != widget.show.id).take(5).toList();
+        _loadingVibe = false;
+        if (_vibeResults.isEmpty) _vibeError = 'No strong matches found for this direction.';
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _loadingVibe = false;
+        _vibeError = error.toString().replaceFirst('Exception: ', '');
+      });
+    }
+  }
+
+  void _openVibeShow(ShowItem show) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => ShowDetailPage(
+          show: show,
+          region: widget.region,
+          saved: false,
+          onToggleSaved: () {},
+          onLocalFeedback: (_) async {},
+        ),
+      ),
+    );
+  }
+
   Future<void> _openProvider(WatchProvider provider) async {
     final candidates = <String?>[
       if (Platform.isIOS) provider.iosUrl,
@@ -1192,31 +1304,25 @@ class _ShowDetailPageState extends State<ShowDetailPage> {
       if (uri == null) continue;
       if (await launchUrl(uri, mode: LaunchMode.externalApplication)) return;
     }
-
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('${provider.name} could not be opened.')),
-    );
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${provider.name} could not be opened.')));
   }
 
   Future<void> _shareShow(BuildContext shareContext) async {
     final show = widget.show;
     final details = <String>[
-      'I found ${show.title} on ForFlickSakes.',
+      'For Flick Sakes... ${show.title} looks worth watching.',
       if (show.year > 0) 'Released ${show.year}.',
       if (show.rating > 0) 'Rating: ${show.rating}/10.',
       if (show.officialUrl != null) show.officialUrl!,
     ].join(' ');
     final box = shareContext.findRenderObject() as RenderBox?;
-
     await SharePlus.instance.share(
       ShareParams(
         text: details,
         title: 'Share ${show.title}',
         subject: 'You might like ${show.title}',
-        sharePositionOrigin: box == null
-            ? null
-            : box.localToGlobal(Offset.zero) & box.size,
+        sharePositionOrigin: box == null ? null : box.localToGlobal(Offset.zero) & box.size,
       ),
     );
   }
@@ -1230,16 +1336,48 @@ class _ShowDetailPageState extends State<ShowDetailPage> {
     return parts.join(' · ');
   }
 
+  Map<String, List<WatchProvider>> _providerGroups(List<WatchProvider> providers) {
+    final groups = <String, List<WatchProvider>>{};
+    for (final provider in providers) {
+      final raw = provider.type.toLowerCase();
+      final label = raw.contains('free')
+          ? 'Free'
+          : raw.contains('rent')
+              ? 'Rent'
+              : raw.contains('buy') || raw.contains('purchase')
+                  ? 'Buy'
+                  : 'Stream';
+      groups.putIfAbsent(label, () => <WatchProvider>[]).add(provider);
+    }
+    return groups;
+  }
+
+  Widget _sectionTitle(BuildContext context, String title, {String? subtitle}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(title, style: Theme.of(context).textTheme.titleLarge),
+        if (subtitle != null) ...[
+          const SizedBox(height: 6),
+          Text(subtitle, style: Theme.of(context).textTheme.bodyMedium),
+        ],
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final show = widget.show;
+    final details = _details;
+    final providerGroups = _options == null ? <String, List<WatchProvider>>{} : _providerGroups(_options!.providers);
+
     return Scaffold(
       body: CustomScrollView(
         slivers: [
           SliverAppBar(
             pinned: true,
-            expandedHeight: 430,
-            backgroundColor: const Color(0xFF07070C),
+            expandedHeight: 390,
+            backgroundColor: const Color(0xFF050309),
             actions: [
               Builder(
                 builder: (shareContext) => IconButton(
@@ -1249,40 +1387,30 @@ class _ShowDetailPageState extends State<ShowDetailPage> {
                 ),
               ),
               IconButton(
-                tooltip: _saved
-                    ? 'Remove from watchlist'
-                    : 'Save to watchlist',
+                tooltip: _saved ? 'Remove from watchlist' : 'Save to watchlist',
                 onPressed: () {
                   widget.onToggleSaved();
                   setState(() => _saved = !_saved);
                 },
-                icon: Icon(
-                  _saved
-                      ? Icons.bookmark_rounded
-                      : Icons.bookmark_border_rounded,
-                ),
+                icon: Icon(_saved ? Icons.bookmark_rounded : Icons.bookmark_border_rounded),
               ),
             ],
             flexibleSpace: FlexibleSpaceBar(
               background: Stack(
                 fit: StackFit.expand,
                 children: [
-                  _Poster(
-                    url: show.poster,
-                    width: double.infinity,
-                    height: 430,
+                  Image.network(
+                    show.poster,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => const ColoredBox(color: Color(0xFF160927)),
                   ),
                   const DecoratedBox(
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         begin: Alignment.topCenter,
                         end: Alignment.bottomCenter,
-                        colors: [
-                          Colors.transparent,
-                          Color(0x5507070C),
-                          Color(0xFF07070C),
-                        ],
-                        stops: [0.35, 0.7, 1],
+                        colors: [Color(0x22050309), Color(0x88050309), Color(0xFF050309)],
+                        stops: [0.25, 0.68, 1],
                       ),
                     ),
                   ),
@@ -1291,77 +1419,54 @@ class _ShowDetailPageState extends State<ShowDetailPage> {
             ),
           ),
           SliverPadding(
-            padding: const EdgeInsets.fromLTRB(24, 8, 24, 44),
+            padding: const EdgeInsets.fromLTRB(24, 4, 24, 48),
             sliver: SliverList.list(
               children: [
-                Text(
-                  show.title,
-                  style: Theme.of(context).textTheme.headlineLarge,
+                const Text(
+                  'FOR FLICK SAKES... THIS ONE MIGHT BE IT.',
+                  style: TextStyle(color: Color(0xFFD7B8FF), fontSize: 11, fontWeight: FontWeight.w900, letterSpacing: 1.25),
                 ),
+                const SizedBox(height: 10),
+                Text(show.title, style: Theme.of(context).textTheme.headlineLarge),
                 const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    if (show.confidence > 0) _MetaPill(icon: Icons.auto_awesome_rounded, label: '${show.confidence}% match', accent: true),
+                    if (show.rating > 0) _MetaPill(icon: Icons.star_rounded, label: '${show.rating}/10'),
+                    if (show.status.isNotEmpty) _MetaPill(icon: Icons.flag_outlined, label: show.status),
+                  ],
+                ),
+                const SizedBox(height: 16),
                 Text(
                   [
                     if (show.year > 0) '${show.year}',
                     if (show.seasons > 0) '${show.seasons} seasons',
-                    if (show.runtime > 0) '${show.runtime} min',
-                    if (show.status.isNotEmpty) show.status,
+                    if (show.runtime > 0) '${show.runtime} min episodes',
+                    if (details != null && details.episodeCount > 0) '${details.episodeCount} episodes',
                   ].join(' · '),
-                  style: const TextStyle(color: Color(0xFF9B95A4)),
+                  style: const TextStyle(color: Color(0xFFAAA0B0), fontSize: 14),
                 ),
-                const SizedBox(height: 16),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: show.genres
-                      .map((genre) => Chip(label: Text(genre)))
-                      .toList(),
-                ),
-                const SizedBox(height: 22),
-                if (show.matchReasons.isNotEmpty) ...[
+                if (details != null && (details.network.isNotEmpty || details.language.isNotEmpty || details.type.isNotEmpty)) ...[
+                  const SizedBox(height: 9),
                   Text(
-                    'Why this matched',
-                    style: Theme.of(context).textTheme.titleLarge,
+                    [details.network, details.language, details.type].where((item) => item.isNotEmpty).join(' · '),
+                    style: const TextStyle(color: Color(0xFF857E8D), fontSize: 13),
                   ),
-                  const SizedBox(height: 10),
-                  ...show.matchReasons.map(
-                    (reason) => Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Icon(
-                            Icons.check_circle_rounded,
-                            size: 19,
-                            color: Color(0xFF4FD5CB),
-                          ),
-                          const SizedBox(width: 9),
-                          Expanded(child: Text(reason)),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
                 ],
-                Text('About', style: Theme.of(context).textTheme.titleLarge),
-                const SizedBox(height: 10),
-                Text(
-                  show.summary,
-                  style: Theme.of(context).textTheme.bodyLarge,
-                ),
-                const SizedBox(height: 30),
+                const SizedBox(height: 18),
+                Wrap(spacing: 8, runSpacing: 8, children: show.genres.map((genre) => Chip(label: Text(genre))).toList()),
+                const SizedBox(height: 26),
                 Row(
                   children: [
                     Expanded(
-                      child: OutlinedButton.icon(
+                      child: FilledButton.icon(
                         onPressed: () {
                           widget.onToggleSaved();
                           setState(() => _saved = !_saved);
                         },
-                        icon: Icon(
-                          _saved
-                              ? Icons.bookmark_rounded
-                              : Icons.bookmark_border_rounded,
-                        ),
+                        icon: Icon(_saved ? Icons.bookmark_rounded : Icons.bookmark_add_outlined),
                         label: Text(_saved ? 'Saved' : 'Save'),
                       ),
                     ),
@@ -1371,109 +1476,181 @@ class _ShowDetailPageState extends State<ShowDetailPage> {
                         builder: (shareContext) => OutlinedButton.icon(
                           onPressed: () => _shareShow(shareContext),
                           icon: const Icon(Icons.share_outlined),
-                          label: const Text('Share series'),
+                          label: const Text('Share'),
                         ),
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 30),
-                Text(
-                  'Help improve your picks',
-                  style: Theme.of(context).textTheme.titleLarge,
+                if (show.matchReasons.isNotEmpty) ...[
+                  const SizedBox(height: 34),
+                  _sectionTitle(context, 'Why this matched', subtitle: 'The evidence behind this recommendation.'),
+                  const SizedBox(height: 14),
+                  Container(
+                    padding: const EdgeInsets.all(18),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF12091B),
+                      borderRadius: BorderRadius.circular(22),
+                      border: Border.all(color: const Color(0xFF321747)),
+                    ),
+                    child: Column(
+                      children: show.matchReasons.map((reason) => Padding(
+                        padding: const EdgeInsets.only(bottom: 9),
+                        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                          const Icon(Icons.check_circle_rounded, color: Color(0xFFB34CFF), size: 19),
+                          const SizedBox(width: 9),
+                          Expanded(child: Text(reason)),
+                        ]),
+                      )).toList(),
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 34),
+                _sectionTitle(context, 'About'),
+                const SizedBox(height: 12),
+                Text(show.summary, style: Theme.of(context).textTheme.bodyLarge),
+                if (_loadingDetails) ...[
+                  const SizedBox(height: 28),
+                  const LinearProgressIndicator(),
+                ] else if (_detailsError != null) ...[
+                  const SizedBox(height: 20),
+                  Text(_detailsError!, style: const TextStyle(color: Color(0xFF8F8697))),
+                ] else if (details != null && details.cast.isNotEmpty) ...[
+                  const SizedBox(height: 34),
+                  _sectionTitle(context, 'Cast', subtitle: 'Main cast from TVMaze.'),
+                  const SizedBox(height: 14),
+                  SizedBox(
+                    height: 150,
+                    child: ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: details.cast.length,
+                      separatorBuilder: (_, __) => const SizedBox(width: 12),
+                      itemBuilder: (context, index) {
+                        final member = details.cast[index];
+                        return SizedBox(
+                          width: 92,
+                          child: Column(
+                            children: [
+                              CircleAvatar(
+                                radius: 38,
+                                backgroundColor: const Color(0xFF24142F),
+                                backgroundImage: member.imageUrl.isEmpty ? null : NetworkImage(member.imageUrl),
+                                child: member.imageUrl.isEmpty ? const Icon(Icons.person_outline_rounded) : null,
+                              ),
+                              const SizedBox(height: 8),
+                              Text(member.name, maxLines: 1, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800)),
+                              if (member.character.isNotEmpty)
+                                Text(member.character, maxLines: 1, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center, style: const TextStyle(fontSize: 10, color: Color(0xFF8F8697))),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 34),
+                _sectionTitle(
+                  context,
+                  'Continue the vibe',
+                  subtitle: 'Use ${show.title} as the reference point, then steer the next picks.',
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 12),
                 Wrap(
                   spacing: 8,
                   runSpacing: 8,
                   children: [
-                    for (final option in const <String>[
-                      'Loved it',
-                      'Not interested',
-                      'Already watched',
-                      'Wrong genre',
-                      'Too dark',
-                      'Too slow',
-                      'Wrong service',
-                    ])
-                      ActionChip(
-                        label: Text(option),
-                        onPressed: () => _sendShowFeedback(option),
-                      ),
+                    ChoiceChip(label: const Text('More like this'), selected: _vibeMode == 'same' && _vibeResults.isNotEmpty, onSelected: (_) => _continueVibe('same')),
+                    ChoiceChip(label: const Text('Lighter'), selected: _vibeMode == 'lighter' && _vibeResults.isNotEmpty, onSelected: (_) => _continueVibe('lighter')),
+                    ChoiceChip(label: const Text('More gripping'), selected: _vibeMode == 'gripping' && _vibeResults.isNotEmpty, onSelected: (_) => _continueVibe('gripping')),
+                    ChoiceChip(label: const Text('Shorter'), selected: _vibeMode == 'shorter' && _vibeResults.isNotEmpty, onSelected: (_) => _continueVibe('shorter')),
+                    ChoiceChip(label: const Text('Funnier'), selected: _vibeMode == 'funny' && _vibeResults.isNotEmpty, onSelected: (_) => _continueVibe('funny')),
                   ],
                 ),
-                const SizedBox(height: 32),
+                if (_loadingVibe) ...[
+                  const SizedBox(height: 18),
+                  const LinearProgressIndicator(),
+                ] else if (_vibeError != null) ...[
+                  const SizedBox(height: 14),
+                  Text(_vibeError!, style: const TextStyle(color: Color(0xFF9F94A8))),
+                ] else if (_vibeResults.isNotEmpty) ...[
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    height: 250,
+                    child: ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: _vibeResults.length,
+                      separatorBuilder: (_, __) => const SizedBox(width: 12),
+                      itemBuilder: (context, index) {
+                        final item = _vibeResults[index];
+                        return SizedBox(
+                          width: 145,
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(18),
+                            onTap: () => _openVibeShow(item),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                _Poster(url: item.poster, width: 145, height: 190),
+                                const SizedBox(height: 8),
+                                Text(item.title, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w900)),
+                                if (item.matchReasons.isNotEmpty)
+                                  Text(item.matchReasons.first, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11, color: Color(0xFF9F94A8))),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 30),
+                _sectionTitle(context, 'Help improve your picks'),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final option in const <String>['Loved it', 'Not interested', 'Already watched', 'Wrong genre', 'Too dark', 'Too slow', 'Wrong service'])
+                      ActionChip(label: Text(option), onPressed: () => _sendShowFeedback(option)),
+                  ],
+                ),
+                const SizedBox(height: 34),
                 Row(
                   children: [
-                    Expanded(
-                      child: Text(
-                        'Where to watch',
-                        style: Theme.of(context).textTheme.titleLarge,
-                      ),
-                    ),
-                    IconButton(
-                      tooltip: 'Refresh availability',
-                      onPressed: _loadingOptions ? null : _loadOptions,
-                      icon: const Icon(Icons.refresh_rounded),
-                    ),
+                    Expanded(child: _sectionTitle(context, 'Where to watch', subtitle: 'Availability for ${widget.region}. Tap a service to open it.')),
+                    IconButton(tooltip: 'Refresh availability', onPressed: _loadingOptions ? null : _loadOptions, icon: const Icon(Icons.refresh_rounded)),
                   ],
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  'Availability for ${widget.region}. Tap a service to open its app or website.',
-                  style: Theme.of(context).textTheme.bodyMedium,
                 ),
                 const SizedBox(height: 14),
                 if (_loadingOptions)
-                  const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 24),
-                    child: Center(child: CircularProgressIndicator()),
-                  )
+                  const Padding(padding: EdgeInsets.symmetric(vertical: 24), child: Center(child: CircularProgressIndicator()))
                 else if (_optionsError != null)
-                  _AvailabilityMessage(
-                    icon: Icons.cloud_off_rounded,
-                    message: _optionsError!,
-                    actionLabel: 'Try again',
-                    onAction: _loadOptions,
-                  )
+                  _AvailabilityMessage(icon: Icons.cloud_off_rounded, message: _optionsError!, actionLabel: 'Try again', onAction: _loadOptions)
                 else if (_options == null || _options!.providers.isEmpty)
-                  _AvailabilityMessage(
-                    icon: Icons.tv_off_outlined,
-                    message: _options?.message ??
-                        'No verified streaming services are available for this region.',
-                    actionLabel: 'Refresh',
-                    onAction: _loadOptions,
-                  )
+                  _AvailabilityMessage(icon: Icons.tv_off_outlined, message: _options?.message ?? 'No verified streaming services are available for this region.', actionLabel: 'Refresh', onAction: _loadOptions)
                 else
-                  ..._options!.providers.map(
-                    (provider) => Card(
+                  for (final entry in providerGroups.entries) ...[
+                    Padding(
+                      padding: const EdgeInsets.only(top: 10, bottom: 8),
+                      child: Text(entry.key.toUpperCase(), style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w900, letterSpacing: 1.2, color: Color(0xFFD7B8FF))),
+                    ),
+                    ...entry.value.map((provider) => Card(
                       margin: const EdgeInsets.only(bottom: 10),
                       child: ListTile(
                         leading: CircleAvatar(
                           backgroundColor: const Color(0xFF2A2340),
-                          child: Text(
-                            provider.name.isEmpty
-                                ? '?'
-                                : provider.name.characters.first.toUpperCase(),
-                            style: const TextStyle(fontWeight: FontWeight.w900),
-                          ),
+                          child: Text(provider.name.isEmpty ? '?' : provider.name.characters.first.toUpperCase(), style: const TextStyle(fontWeight: FontWeight.w900)),
                         ),
                         title: Text(provider.name),
                         subtitle: Text(_providerSubtitle(provider)),
                         trailing: const Icon(Icons.open_in_new_rounded),
                         onTap: () => _openProvider(provider),
                       ),
-                    ),
-                  ),
+                    )),
+                  ],
                 if (_options?.attribution.isNotEmpty ?? false) ...[
                   const SizedBox(height: 8),
-                  Text(
-                    _options!.attribution,
-                    style: const TextStyle(
-                      color: Color(0xFF77717F),
-                      fontSize: 12,
-                    ),
-                  ),
+                  Text(_options!.attribution, style: const TextStyle(color: Color(0xFF77717F), fontSize: 12)),
                 ],
               ],
             ),
@@ -1550,6 +1727,325 @@ class _Poster extends StatelessWidget {
                   child: Icon(Icons.movie_outlined, size: 48),
                 ),
               ),
+      ),
+    );
+  }
+}
+
+
+class ForYouPage extends StatefulWidget {
+  const ForYouPage({
+    required this.saved,
+    required this.watched,
+    required this.dismissed,
+    required this.knownShows,
+    required this.region,
+    required this.services,
+    required this.maxSeasons,
+    required this.completedOnly,
+    required this.onToggleSaved,
+    required this.onFeedback,
+    required this.onShowsSeen,
+    super.key,
+  });
+
+  final Set<int> saved;
+  final Set<int> watched;
+  final Set<int> dismissed;
+  final Map<int, ShowItem> knownShows;
+  final String region;
+  final Set<String> services;
+  final int maxSeasons;
+  final bool completedOnly;
+  final ValueChanged<int> onToggleSaved;
+  final Future<void> Function(int showId, String reason) onFeedback;
+  final Future<void> Function(Iterable<ShowItem> shows) onShowsSeen;
+
+  @override
+  State<ForYouPage> createState() => _ForYouPageState();
+}
+
+class _ForYouPageState extends State<ForYouPage> {
+  final ApiService _api = ApiService();
+  bool _loading = false;
+  String? _error;
+  List<_ForYouSection> _sections = const <_ForYouSection>[];
+  String _signature = '';
+
+  String get _currentSignature {
+    final saved = widget.saved.toList()..sort();
+    final watched = widget.watched.toList()..sort();
+    final dismissed = widget.dismissed.toList()..sort();
+    return '${saved.join(',')}|${watched.join(',')}|${dismissed.join(',')}|${widget.region}|${widget.maxSeasons}|${widget.completedOnly}';
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    Future<void>.microtask(_refresh);
+  }
+
+  @override
+  void didUpdateWidget(covariant ForYouPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (_currentSignature != _signature && !_loading) {
+      Future<void>.microtask(_refresh);
+    }
+  }
+
+  List<ShowItem> get _positiveShows {
+    final ids = <int>{...widget.saved, ...widget.watched};
+    return ids.map((id) => widget.knownShows[id]).whereType<ShowItem>().toList();
+  }
+
+  Future<RecommendationResult> _recommend(String query, Set<int> excluded) {
+    return _api.recommendFromPrompt(
+      query: query,
+      region: widget.region,
+      services: widget.services,
+      maxSeasons: widget.maxSeasons,
+      completedOnly: widget.completedOnly,
+      excludedIds: excluded,
+    );
+  }
+
+  Future<void> _refresh() async {
+    final signature = _currentSignature;
+    final positives = _positiveShows;
+    if (positives.isEmpty) {
+      if (!mounted) return;
+      setState(() {
+        _signature = signature;
+        _sections = const <_ForYouSection>[];
+        _loading = false;
+        _error = null;
+      });
+      return;
+    }
+
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+
+    try {
+      final excluded = <int>{...widget.dismissed, ...widget.watched};
+      final anchor = positives.firstWhere(
+        (show) => widget.saved.contains(show.id),
+        orElse: () => positives.first,
+      );
+
+      final genreCounts = <String, int>{};
+      for (final show in positives) {
+        for (final genre in show.genres) {
+          genreCounts[genre] = (genreCounts[genre] ?? 0) + 1;
+        }
+      }
+      final topGenres = genreCounts.entries.toList()
+        ..sort((a, b) => b.value.compareTo(a.value));
+      final genreNames = topGenres.take(2).map((entry) => entry.key).toList();
+
+      final futures = <Future<RecommendationResult>>[
+        _recommend('Something like ${anchor.title}', excluded),
+        if (genreNames.isNotEmpty)
+          _recommend('A really good ${genreNames.join(' ')} series', excluded),
+        _recommend('Something easy to watch with episodes under 40 minutes', excluded),
+      ];
+      final results = await Future.wait(futures);
+
+      final sections = <_ForYouSection>[
+        _ForYouSection(
+          title: 'Because you ${widget.saved.contains(anchor.id) ? 'saved' : 'watched'} ${anchor.title}',
+          subtitle: 'Using a show you chose as the reference point.',
+          shows: results[0].shows.where((show) => show.id != anchor.id).take(6).toList(),
+        ),
+      ];
+      var resultIndex = 1;
+      if (genreNames.isNotEmpty) {
+        sections.add(_ForYouSection(
+          title: 'Your kind of ${genreNames.first.toLowerCase()}',
+          subtitle: 'Based on genres that appear in your saved and watched titles.',
+          shows: results[resultIndex++].shows.take(6).toList(),
+        ));
+      }
+      sections.add(_ForYouSection(
+        title: 'Easy watches tonight',
+        subtitle: 'Shorter episodes, filtered through your normal profile settings.',
+        shows: results[resultIndex].shows.take(6).toList(),
+      ));
+
+      final allShows = sections.expand((section) => section.shows);
+      await widget.onShowsSeen(allShows);
+
+      if (!mounted) return;
+      setState(() {
+        _signature = signature;
+        _sections = sections.where((section) => section.shows.isNotEmpty).toList();
+        _loading = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _signature = signature;
+        _loading = false;
+        _error = error.toString().replaceFirst('Exception: ', '');
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final positives = _positiveShows;
+    return SafeArea(
+      child: RefreshIndicator(
+        onRefresh: _refresh,
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(24, 28, 24, 120),
+          children: [
+            Text('For You', style: Theme.of(context).textTheme.headlineLarge),
+            const SizedBox(height: 8),
+            const Text(
+              'Because your taste is starting to show.',
+              style: TextStyle(color: Color(0xFFD7B8FF), fontSize: 16, fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 10),
+            const Text(
+              'These picks use choices you have actually made in ForFlickSakes. Pull down any time to refresh them.',
+            ),
+            const SizedBox(height: 26),
+            if (positives.isEmpty)
+              Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF100817),
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(color: const Color(0xFF2C153D)),
+                ),
+                child: const Column(
+                  children: [
+                    Icon(Icons.favorite_outline_rounded, size: 46, color: Color(0xFFD7B8FF)),
+                    SizedBox(height: 14),
+                    Text('Teach us your taste.', style: TextStyle(fontSize: 21, fontWeight: FontWeight.w900)),
+                    SizedBox(height: 8),
+                    Text(
+                      'Save a show, mark something as watched, or tell us you loved it. Your personalised picks will build from those real signals.',
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              )
+            else if (_loading && _sections.isEmpty)
+              const Padding(
+                padding: EdgeInsets.only(top: 50),
+                child: Column(
+                  children: [
+                    CircularProgressIndicator(),
+                    SizedBox(height: 18),
+                    Text('Learning the shape of your watchlist...'),
+                  ],
+                ),
+              )
+            else if (_error != null && _sections.isEmpty)
+              _ForYouError(message: _error!, onRetry: _refresh)
+            else ...[
+              for (final section in _sections) ...[
+                _ForYouSectionView(
+                  section: section,
+                  region: widget.region,
+                  saved: widget.saved,
+                  onToggleSaved: widget.onToggleSaved,
+                  onFeedback: widget.onFeedback,
+                ),
+                const SizedBox(height: 30),
+              ],
+              if (_loading) const LinearProgressIndicator(),
+              if (_error != null) ...[
+                const SizedBox(height: 12),
+                Text(_error!, style: const TextStyle(color: Color(0xFF9F94A8))),
+              ],
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ForYouSection {
+  const _ForYouSection({
+    required this.title,
+    required this.subtitle,
+    required this.shows,
+  });
+  final String title;
+  final String subtitle;
+  final List<ShowItem> shows;
+}
+
+class _ForYouSectionView extends StatelessWidget {
+  const _ForYouSectionView({
+    required this.section,
+    required this.region,
+    required this.saved,
+    required this.onToggleSaved,
+    required this.onFeedback,
+  });
+  final _ForYouSection section;
+  final String region;
+  final Set<int> saved;
+  final ValueChanged<int> onToggleSaved;
+  final Future<void> Function(int showId, String reason) onFeedback;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(section.title, style: Theme.of(context).textTheme.titleLarge),
+        const SizedBox(height: 5),
+        Text(section.subtitle, style: const TextStyle(color: Color(0xFF9F94A8))),
+        const SizedBox(height: 14),
+        for (final show in section.shows.take(3)) ...[
+          ResultCard(
+            show: show,
+            region: region,
+            saved: saved.contains(show.id),
+            onToggleSaved: () => onToggleSaved(show.id),
+            onFeedback: (reason) => onFeedback(show.id, reason),
+          ),
+          const SizedBox(height: 14),
+        ],
+      ],
+    );
+  }
+}
+
+class _ForYouError extends StatelessWidget {
+  const _ForYouError({required this.message, required this.onRetry});
+  final String message;
+  final Future<void> Function() onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(22),
+      decoration: BoxDecoration(
+        color: const Color(0xFF100817),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: const Color(0xFF2C153D)),
+      ),
+      child: Column(
+        children: [
+          const Icon(Icons.cloud_off_outlined, size: 40),
+          const SizedBox(height: 12),
+          Text(message, textAlign: TextAlign.center),
+          const SizedBox(height: 12),
+          OutlinedButton.icon(
+            onPressed: () => onRetry(),
+            icon: const Icon(Icons.refresh_rounded),
+            label: const Text('Try again'),
+          ),
+        ],
       ),
     );
   }
@@ -1740,6 +2236,55 @@ class ProfilePage extends StatelessWidget {
             onChanged: onCompletedOnlyChanged,
           ),
           const Divider(height: 42),
+          Text('Beta & privacy', style: Theme.of(context).textTheme.titleLarge),
+          const SizedBox(height: 8),
+          const Text('ForFlickSakes beta · version 1.0.0 (1)', style: TextStyle(color: Color(0xFF9893A3))),
+          const SizedBox(height: 8),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.bug_report_outlined),
+            title: const Text('Send beta feedback'),
+            subtitle: const Text('Tell us what worked, what felt wrong, or what you expected instead.'),
+            trailing: const Icon(Icons.chevron_right_rounded),
+            onTap: () => _showBetaFeedback(context),
+          ),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.privacy_tip_outlined),
+            title: const Text('Privacy'),
+            subtitle: const Text('What is stored on this device during beta.'),
+            trailing: const Icon(Icons.chevron_right_rounded),
+            onTap: () => _showInfoPage(
+              context,
+              title: 'Privacy',
+              body: 'ForFlickSakes currently stores your streaming preferences, saved titles, watched/dismissed signals and recommendation feedback locally on this device. Recommendation requests are sent to the ForFlickSakes backend so the concierge can return results. This beta does not provide account or cloud sync yet. Before public release, this in-app summary should be replaced or linked to the final published privacy policy.',
+            ),
+          ),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.description_outlined),
+            title: const Text('Beta terms'),
+            subtitle: const Text('Important notes for this pre-release build.'),
+            trailing: const Icon(Icons.chevron_right_rounded),
+            onTap: () => _showInfoPage(
+              context,
+              title: 'Beta terms',
+              body: 'This is a pre-release test build. Catalogue metadata, streaming availability and recommendation quality may be incomplete or change. Always confirm availability with the streaming provider. This screen is a beta notice, not a substitute for the final legal terms required before public distribution.',
+            ),
+          ),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.info_outline_rounded),
+            title: const Text('About ForFlickSakes'),
+            subtitle: const Text('Stop scrolling. Start watching.'),
+            trailing: const Icon(Icons.chevron_right_rounded),
+            onTap: () => _showInfoPage(
+              context,
+              title: 'ForFlickSakes',
+              body: 'Your Watch Concierge.\n\nFOR FLICK SAKES.\n\nStop scrolling. Start watching.\n\nForFlickSakes helps you turn a mood, a constraint or a show you already love into a small set of confident things to watch next.',
+            ),
+          ),
+          const Divider(height: 42),
           ListTile(
             contentPadding: EdgeInsets.zero,
             leading: const Icon(Icons.restart_alt_rounded),
@@ -1764,12 +2309,87 @@ class ProfilePage extends StatelessWidget {
             contentPadding: EdgeInsets.zero,
             leading: Icon(Icons.lock_outline_rounded),
             title: Text('Stored locally'),
-            subtitle: Text('Sprint 4 keeps taste data on this device. Cloud sync comes with accounts.'),
+            subtitle: Text('Taste data is stored on this device during beta. Cloud sync can come with accounts later.'),
           ),
         ],
       ),
     );
   }
+}
+
+
+void _showInfoPage(BuildContext context, {required String title, required String body}) {
+  Navigator.of(context).push(
+    MaterialPageRoute<void>(
+      builder: (context) => Scaffold(
+        appBar: AppBar(title: Text(title)),
+        body: SafeArea(
+          child: ListView(
+            padding: const EdgeInsets.all(24),
+            children: [
+              Text(title, style: Theme.of(context).textTheme.headlineSmall),
+              const SizedBox(height: 18),
+              Text(body, style: const TextStyle(fontSize: 16, height: 1.55, color: Color(0xFFB7B2C0))),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+Future<void> _showBetaFeedback(BuildContext context) async {
+  final controller = TextEditingController();
+  await showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    showDragHandle: true,
+    backgroundColor: const Color(0xFF15111D),
+    builder: (sheetContext) => Padding(
+      padding: EdgeInsets.fromLTRB(
+        24,
+        4,
+        24,
+        MediaQuery.viewInsetsOf(sheetContext).bottom + 24,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Beta feedback', style: Theme.of(sheetContext).textTheme.headlineSmall),
+          const SizedBox(height: 8),
+          const Text('For now this captures your note so you can copy it into the beta report channel. Direct submission comes when the production feedback service is connected.'),
+          const SizedBox(height: 16),
+          TextField(
+            controller: controller,
+            minLines: 4,
+            maxLines: 7,
+            autofocus: true,
+            decoration: const InputDecoration(
+              hintText: 'What happened? What did you expect?',
+              filled: true,
+              fillColor: Color(0xFF100817),
+            ),
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: () {
+                Navigator.pop(sheetContext);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Thanks — beta feedback entry is ready for production wiring.')),
+                );
+              },
+              icon: const Icon(Icons.check_rounded),
+              label: const Text('Done'),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+  controller.dispose();
 }
 
 class _TasteStat extends StatelessWidget {

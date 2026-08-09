@@ -162,4 +162,56 @@ class RecommendationResult {
   }
 }
 
+
+class ShowCastMember {
+  const ShowCastMember({
+    required this.name,
+    required this.character,
+    required this.imageUrl,
+  });
+
+  final String name;
+  final String character;
+  final String imageUrl;
+
+  factory ShowCastMember.fromJson(Map<String, dynamic> json) => ShowCastMember(
+        name: json['name'] as String? ?? '',
+        character: json['character'] as String? ?? '',
+        imageUrl: json['imageUrl'] as String? ?? '',
+      );
+}
+
+class ShowDetails {
+  const ShowDetails({
+    required this.language,
+    required this.type,
+    required this.network,
+    required this.premiered,
+    required this.ended,
+    required this.episodeCount,
+    required this.cast,
+  });
+
+  final String language;
+  final String type;
+  final String network;
+  final String premiered;
+  final String ended;
+  final int episodeCount;
+  final List<ShowCastMember> cast;
+
+  factory ShowDetails.fromJson(Map<String, dynamic> json) => ShowDetails(
+        language: json['language'] as String? ?? '',
+        type: json['type'] as String? ?? '',
+        network: json['network'] as String? ?? '',
+        premiered: json['premiered'] as String? ?? '',
+        ended: json['ended'] as String? ?? '',
+        episodeCount: (json['episodeCount'] as num?)?.toInt() ?? 0,
+        cast: (json['cast'] as List<dynamic>? ?? const <dynamic>[])
+            .whereType<Map<String, dynamic>>()
+            .map(ShowCastMember.fromJson)
+            .toList(),
+      );
+}
+
 String _normalizeProviderName(String name) => name == 'Max' ? 'HBO Max' : name;

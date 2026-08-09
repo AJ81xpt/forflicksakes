@@ -29,6 +29,28 @@ class ApiService {
     });
   }
 
+  Future<RecommendationResult> continueTheVibe({
+    required String title,
+    required String refinement,
+    required String region,
+  }) {
+    final suffix = switch (refinement) {
+      'lighter' => ' but lighter and less dark',
+      'gripping' => ' but more gripping',
+      'shorter' => ' but with short episodes under 35 minutes',
+      'funny' => ' but funnier',
+      _ => '',
+    };
+    return recommendFromPrompt(
+      query: 'Something like $title$suffix',
+      region: region,
+      services: const <String>{},
+      maxSeasons: 10,
+      completedOnly: false,
+      excludedIds: const <int>{},
+    );
+  }
+
   Future<RecommendationResult> recommendFromMood({
     required String mood,
     required String region,
@@ -113,6 +135,21 @@ class ApiService {
     if (response.statusCode < 200 || response.statusCode >= 300) {
       throw Exception('Feedback could not be saved.');
     }
+  }
+
+
+  Future<ShowDetails> showDetails({required int showId}) async {
+    final response = await _client
+        .get(Uri.parse('$_baseUrl/shows/$showId/details'))
+        .timeout(const Duration(seconds: 15));
+
+    if (response.statusCode != 200) {
+      throw Exception('Show details service returned ${response.statusCode}.');
+    }
+
+    return ShowDetails.fromJson(
+      jsonDecode(response.body) as Map<String, dynamic>,
+    );
   }
 
   Future<WatchOptions> watchOptions({

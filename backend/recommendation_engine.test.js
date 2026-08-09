@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { auditPrompt, looksLikeTitleLookup, normalizeTitle, parsePrompt, scoreMood, scorePrompt } from './recommendation_engine.js';
+import { auditPrompt, showProfile, looksLikeTitleLookup, normalizeTitle, parsePrompt, scoreMood, scorePrompt } from './recommendation_engine.js';
 
 const show = (overrides = {}) => ({
   id: 1,
@@ -96,4 +96,34 @@ test('descriptive requests are not mistaken for exact title searches', () => {
 test('title normalization ignores punctuation and case', () => {
   assert.equal(normalizeTitle('Happy!'), normalizeTitle('happy'));
   assert.equal(normalizeTitle('MR. ROBOT'), normalizeTitle('Mr Robot'));
+});
+
+
+test('less dark refinement is an exclusion, not a request for dark content', () => {
+  const intent = parsePrompt('something like Severance, less dark and nothing bleak');
+  assert.ok(intent.exclusions.includes('dark'));
+  assert.equal(intent.themes.includes('dark'), false);
+});
+
+test('funnier refinement becomes a comedy requirement', () => {
+  const intent = parsePrompt('something clever, make it funnier');
+  assert.ok(intent.requiredGenres.includes('Comedy'));
+});
+
+test('more gripping refinement rewards intense thrillers', () => {
+  const intent = parsePrompt('a mystery, more gripping and suspenseful');
+  assert.ok(intent.themes.includes('gripping'));
+  const candidate = show({ genres: ['Mystery', 'Thriller'], summary: '<p>A tense suspense conspiracy full of danger.</p>' });
+  assert.equal(scorePrompt(candidate, intent.raw, intent).passed, true);
+});
+
+
+test('reference profile rewards a closer vibe match', () => {
+  const intent = parsePrompt('something like Reference Show');
+  intent.referenceGenres = ['Mystery', 'Science-Fiction'];
+  intent.referenceName = 'Reference Show';
+  intent.referenceProfile = showProfile(show({ genres: ['Mystery', 'Science-Fiction'], summary: '<p>A psychological puzzle with a conspiracy.</p>' })).attributes ? showProfile(show({ genres: ['Mystery', 'Science-Fiction'], summary: '<p>A psychological puzzle with a conspiracy.</p>' })) : null;
+  const close = show({ name: 'Close Match', genres: ['Mystery', 'Science-Fiction'], summary: '<p>A psychological puzzle with a conspiracy.</p>' });
+  const far = show({ name: 'Far Match', genres: ['Comedy', 'Romance'], summary: '<p>A warm uplifting community romance.</p>' });
+  assert.ok(scorePrompt(close, intent.raw, intent).score > scorePrompt(far, intent.raw, intent).score);
 });
