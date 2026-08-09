@@ -7,7 +7,8 @@
     "start": "node server.js",
     "check": "node --check server.js && node --check recommendation_engine.js",
     "test": "node --test recommendation_engine.test.js",
-    "test:streaming": "node --test streaming_availability.test.mjs"
+    "test:streaming": "node --test streaming_availability.test.mjs",
+    "test:title": "node --test title_matching.test.mjs"
   },
   "dependencies": {
     "cors": "^2.8.5",

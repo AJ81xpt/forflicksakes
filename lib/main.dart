@@ -2260,7 +2260,7 @@ class ProfilePage extends StatelessWidget {
             contentPadding: EdgeInsets.zero,
             leading: Icon(Icons.lock_outline_rounded),
             title: Text('Stored locally'),
-            subtitle: Text('Sprint 4 keeps taste data on this device. Cloud sync comes with accounts.'),
+            subtitle: Text('Your preferences, watch history and watchlist stay on this device.'),
           ),
         ],
       ),

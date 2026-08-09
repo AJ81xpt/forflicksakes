@@ -125,13 +125,30 @@ function streamingOptionToProvider(option) {
 }
 
 function dedupeProviders(providers) {
-  const seen = new Set();
-  return providers.filter((provider) => {
-    const key = `${provider.name}|${provider.type}|${provider.webUrl || ''}`;
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
+  const grouped = new Map();
+
+  for (const provider of providers) {
+    const name = normalizeProviderName(provider.name);
+    const type = String(provider.type || 'subscription').toLowerCase();
+    const key = `${name.toLowerCase()}|${type}`;
+    const normalized = { ...provider, name, type };
+    const existing = grouped.get(key);
+
+    if (!existing || (!existing.webUrl && normalized.webUrl)) {
+      grouped.set(key, normalized);
+    }
+  }
+
+  const values = [...grouped.values()];
+  const subscriptionBrands = new Set(
+    values
+      .filter((provider) => provider.type === 'subscription')
+      .map((provider) => provider.name.toLowerCase()),
+  );
+
+  return values.filter((provider) =>
+    !(provider.type === 'addon' && subscriptionBrands.has(provider.name.toLowerCase())),
+  );
 }
 
 async function streamingAvailabilityShow(imdbId, region) {
@@ -652,8 +669,71 @@ async function enrichShowsV2(shows, limit = 32) {
 
 
 
+
+function levenshteinDistance(a, b) {
+  const left = normalizeTitle(a);
+  const right = normalizeTitle(b);
+  const matrix = Array.from({ length: left.length + 1 }, () => Array(right.length + 1).fill(0));
+
+  for (let i = 0; i <= left.length; i += 1) matrix[i][0] = i;
+  for (let j = 0; j <= right.length; j += 1) matrix[0][j] = j;
+
+  for (let i = 1; i <= left.length; i += 1) {
+    for (let j = 1; j <= right.length; j += 1) {
+      const cost = left[i - 1] === right[j - 1] ? 0 : 1;
+      matrix[i][j] = Math.min(
+        matrix[i - 1][j] + 1,
+        matrix[i][j - 1] + 1,
+        matrix[i - 1][j - 1] + cost,
+      );
+    }
+  }
+  return matrix[left.length][right.length];
+}
+
+function titleSimilarity(query, candidate) {
+  const wanted = normalizeTitle(query);
+  const actual = normalizeTitle(candidate);
+  if (!wanted || !actual) return 0;
+  if (wanted === actual) return 1;
+
+  const maxLength = Math.max(wanted.length, actual.length);
+  const editScore = maxLength ? 1 - (levenshteinDistance(wanted, actual) / maxLength) : 0;
+
+  const wantedWords = new Set(wanted.split(' ').filter(Boolean));
+  const actualWords = new Set(actual.split(' ').filter(Boolean));
+  const overlap = [...wantedWords].filter((word) => actualWords.has(word)).length;
+  const union = new Set([...wantedWords, ...actualWords]).size || 1;
+  const wordScore = overlap / union;
+
+  return Math.max(editScore, wordScore);
+}
+
+function conservativeFuzzyTitleMatch(query, shows) {
+  const normalized = normalizeTitle(query);
+  if (!normalized) return null;
+
+  const ranked = shows
+    .filter(Boolean)
+    .map((show) => ({ show, similarity: titleSimilarity(query, show.name) }))
+    .sort((a, b) => b.similarity - a.similarity);
+
+  const best = ranked[0];
+  const second = ranked[1];
+  if (!best) return null;
+
+  const minimum = normalized.length <= 5 ? 0.86 : 0.78;
+  const margin = second ? best.similarity - second.similarity : 1;
+
+  if (best.similarity < minimum) return null;
+  if (second && margin < 0.06 && best.similarity < 0.92) return null;
+
+  return best;
+}
+
 async function exactTitleCandidate(query) {
   if (!looksLikeTitleLookup(query)) return null;
+
   let searchResults;
   try {
     searchResults = await tvMazeSearch(query);
@@ -661,23 +741,31 @@ async function exactTitleCandidate(query) {
     return null;
   }
 
+  const shows = searchResults.map((item) => item?.show).filter(Boolean);
   const wanted = normalizeTitle(query);
-  const match = searchResults
-    .map((item) => item?.show)
-    .filter(Boolean)
-    .find((show) => normalizeTitle(show.name) === wanted);
+
+  let match = shows.find((show) => normalizeTitle(show.name) === wanted);
+  let reason = 'Exact title match';
+
+  if (!match) {
+    const fuzzy = conservativeFuzzyTitleMatch(query, shows);
+    match = fuzzy?.show || null;
+    if (match) reason = `Title match: ${match.name}`;
+  }
 
   if (!match) return null;
+
   let show = match;
   try {
     show = await tvMazeShow(match.id);
   } catch {
-    // The search payload is still enough to display a useful result.
+    // Search payload remains usable.
   }
+
   return {
     show,
     score: 100,
-    reasons: ['Exact title match'],
+    reasons: [reason],
   };
 }
 
@@ -816,9 +904,21 @@ function normalizeProviderName(name = '') {
   const value = String(name).trim();
   if (!value) return value;
   const lower = value.toLowerCase();
-  if (lower === 'max' || lower === 'hbo max') return 'HBO Max';
+
+  if (
+    lower === 'max' ||
+    lower === 'hbo max' ||
+    lower === 'hbo' ||
+    lower.includes('hbo max') ||
+    lower.includes('max amazon channel') ||
+    lower.includes('max channel')
+  ) {
+    return 'HBO Max';
+  }
+
   if (lower === 'amazon prime video' || lower === 'prime video') return 'Prime Video';
   if (lower === 'apple tv' || lower === 'apple tv plus' || lower === 'apple tv+') return 'Apple TV+';
+
   return value;
 }
 

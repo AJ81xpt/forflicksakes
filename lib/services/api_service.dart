@@ -22,11 +22,19 @@ class ApiService {
     required bool completedOnly,
     required Set<int> excludedIds,
   }) {
-    return _recommend(<String, dynamic>{
-      'mode': 'prompt',
-      'query': query,
-      'profile': _profile(region, services, maxSeasons, completedOnly, excludedIds),
-    });
+    return _recommend(
+      <String, dynamic>{
+        'mode': 'prompt',
+        'query': query,
+        'profile': _profile(
+          region,
+          services,
+          maxSeasons,
+          completedOnly,
+          excludedIds,
+        ),
+      },
+    );
   }
 
   Future<RecommendationResult> continueTheVibe({
@@ -41,6 +49,7 @@ class ApiService {
       'funny' => ' but funnier',
       _ => '',
     };
+
     return recommendFromPrompt(
       query: 'Something like $title$suffix',
       region: region,
@@ -59,11 +68,19 @@ class ApiService {
     required bool completedOnly,
     required Set<int> excludedIds,
   }) {
-    return _recommend(<String, dynamic>{
-      'mode': 'mood',
-      'mood': mood.toLowerCase(),
-      'profile': _profile(region, services, maxSeasons, completedOnly, excludedIds),
-    });
+    return _recommend(
+      <String, dynamic>{
+        'mode': 'mood',
+        'mood': mood.toLowerCase(),
+        'profile': _profile(
+          region,
+          services,
+          maxSeasons,
+          completedOnly,
+          excludedIds,
+        ),
+      },
+    );
   }
 
   Map<String, dynamic> _profile(
@@ -72,13 +89,15 @@ class ApiService {
     int maxSeasons,
     bool completedOnly,
     Set<int> excludedIds,
-  ) => <String, dynamic>{
-        'region': region,
-        'services': services.toList(),
-        'maxSeasons': maxSeasons,
-        'completedOnly': completedOnly,
-        'excludedIds': excludedIds.toList(),
-      };
+  ) {
+    return <String, dynamic>{
+      'region': region,
+      'services': services.toList(),
+      'maxSeasons': maxSeasons,
+      'completedOnly': completedOnly,
+      'excludedIds': excludedIds.toList(),
+    };
+  }
 
   Future<RecommendationResult> _recommend(
     Map<String, dynamic> body,
@@ -86,19 +105,33 @@ class ApiService {
     final response = await _client
         .post(
           Uri.parse('$_baseUrl/recommendations'),
-          headers: const {'Content-Type': 'application/json'},
+          headers: const <String, String>{
+            'Content-Type': 'application/json',
+          },
           body: jsonEncode(body),
         )
-        .timeout(const Duration(seconds: 20));
+        .timeout(
+          const Duration(seconds: 70),
+          onTimeout: () {
+            throw Exception(
+              'Your Watch Concierge is taking longer than usual to wake up. '
+              'Please try again.',
+            );
+          },
+        );
 
     if (response.statusCode != 200) {
-      String message = 'Recommendation service returned ${response.statusCode}.';
+      String message =
+          'Recommendation service returned ${response.statusCode}.';
+
       try {
-        final json = jsonDecode(response.body) as Map<String, dynamic>;
+        final json =
+            jsonDecode(response.body) as Map<String, dynamic>;
         message = json['error'] as String? ?? message;
       } catch (_) {
-        // Preserve the generic message.
+        // Keep the generic error message.
       }
+
       throw Exception(message);
     }
 
@@ -119,32 +152,64 @@ class ApiService {
     final response = await _client
         .post(
           Uri.parse('$_baseUrl/feedback'),
-          headers: const {'Content-Type': 'application/json'},
-          body: jsonEncode(<String, dynamic>{
-            'type': type,
-            'reason': reason,
-            'showId': showId,
-            'mode': mode,
-            'mood': mood,
-            'query': query,
-            'resultIds': resultIds,
-          }),
+          headers: const <String, String>{
+            'Content-Type': 'application/json',
+          },
+          body: jsonEncode(
+            <String, dynamic>{
+              'type': type,
+              'reason': reason,
+              'showId': showId,
+              'mode': mode,
+              'mood': mood,
+              'query': query,
+              'resultIds': resultIds,
+            },
+          ),
         )
-        .timeout(const Duration(seconds: 10));
+        .timeout(
+          const Duration(seconds: 10),
+          onTimeout: () {
+            throw Exception('Feedback could not be saved.');
+          },
+        );
 
-    if (response.statusCode < 200 || response.statusCode >= 300) {
+    if (response.statusCode < 200 ||
+        response.statusCode >= 300) {
       throw Exception('Feedback could not be saved.');
     }
   }
 
-
-  Future<ShowDetails> showDetails({required int showId}) async {
+  Future<ShowDetails> showDetails({
+    required int showId,
+  }) async {
     final response = await _client
-        .get(Uri.parse('$_baseUrl/shows/$showId/details'))
-        .timeout(const Duration(seconds: 15));
+        .get(
+          Uri.parse('$_baseUrl/shows/$showId/details'),
+        )
+        .timeout(
+          const Duration(seconds: 60),
+          onTimeout: () {
+            throw Exception(
+              'Show details are taking longer than usual. '
+              'Please try again.',
+            );
+          },
+        );
 
     if (response.statusCode != 200) {
-      throw Exception('Show details service returned ${response.statusCode}.');
+      String message =
+          'Show details service returned ${response.statusCode}.';
+
+      try {
+        final json =
+            jsonDecode(response.body) as Map<String, dynamic>;
+        message = json['error'] as String? ?? message;
+      } catch (_) {
+        // Keep the generic error message.
+      }
+
+      throw Exception(message);
     }
 
     return ShowDetails.fromJson(
@@ -157,16 +222,44 @@ class ApiService {
     required String region,
   }) async {
     final uri = Uri.parse(
-      '$_baseUrl/shows/$showId/providers?region=${Uri.encodeQueryComponent(region)}',
+      '$_baseUrl/shows/$showId/providers'
+      '?region=${Uri.encodeQueryComponent(region)}',
     );
-    final response = await _client.get(uri).timeout(const Duration(seconds: 15));
+
+    final response = await _client
+        .get(uri)
+        .timeout(
+          const Duration(seconds: 60),
+          onTimeout: () {
+            throw Exception(
+              'Streaming availability is taking longer than usual. '
+              'Please try again.',
+            );
+          },
+        );
 
     if (response.statusCode != 200) {
-      throw Exception('Provider service returned ${response.statusCode}.');
+      String message =
+          'Streaming availability service returned '
+          '${response.statusCode}.';
+
+      try {
+        final json =
+            jsonDecode(response.body) as Map<String, dynamic>;
+        message = json['error'] as String? ?? message;
+      } catch (_) {
+        // Keep the generic error message.
+      }
+
+      throw Exception(message);
     }
 
     return WatchOptions.fromJson(
       jsonDecode(response.body) as Map<String, dynamic>,
     );
+  }
+
+  void dispose() {
+    _client.close();
   }
 }
