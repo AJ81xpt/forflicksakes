@@ -636,7 +636,7 @@ app.get('/health', (_request, response) => {
     ok: true,
     catalogue: 'TVMaze',
     recommendationModes: ['prompt', 'mood'],
-    providers: watchmodeKey ? 'Watchmode' : 'not-configured',
+    providers: 'resolver-foundation',
     feedbackEvents: feedbackEvents.length,
   });
 });
