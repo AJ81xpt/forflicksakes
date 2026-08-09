@@ -1,11 +1,11 @@
-﻿import 'dotenv/config';
+import 'dotenv/config';
 import cors from 'cors';
 import express from 'express';
 import { knownMoods, looksLikeTitleLookup, moodLabel, normalizeTitle, parsePrompt as parsePromptV2, scoreMood as scoreMoodV2, scorePrompt as scorePromptV2, showProfile as showProfileV2 } from './recommendation_engine.js';
 
 const app = express();
 const port = Number(process.env.PORT || 8080);
-const watchmodeKey = process.env.WATCHMODE_API_KEY?.trim();
+const streamingAvailabilityKey = process.env.STREAMING_AVAILABILITY_API_KEY?.trim();
 
 app.use(cors());
 app.use(express.json({ limit: '64kb' }));
@@ -77,24 +77,16 @@ const genericQueryWords = new Set([
 
 
 const availabilityCache = new Map();
-const AVAILABILITY_TTL_MS = 48 * 60 * 60 * 1000;
+const availabilityInFlight = new Map();
+const AVAILABILITY_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const AVAILABILITY_NEGATIVE_TTL_MS = 24 * 60 * 60 * 1000;
 
 const SUPPORTED_AVAILABILITY_REGIONS = new Set([
   'ZA', 'GB', 'US',
   'AT', 'BE', 'BG', 'HR', 'CY', 'CZ', 'DK', 'EE', 'FI', 'FR', 'DE', 'GR',
   'HU', 'IE', 'IT', 'LV', 'LT', 'LU', 'MT', 'NL', 'PL', 'PT', 'RO', 'SK',
-  'SI', 'ES', 'SE'
+  'SI', 'ES', 'SE',
 ]);
-
-function normalizeProviderName(name = '') {
-  const value = String(name).trim();
-  if (!value) return value;
-  const lower = value.toLowerCase();
-  if (lower === 'max' || lower === 'hbo max') return 'HBO Max';
-  if (lower === 'amazon prime video' || lower === 'prime video') return 'Prime Video';
-  if (lower === 'apple tv plus' || lower === 'apple tv+') return 'Apple TV+';
-  return value;
-}
 
 function availabilityCacheKey(showId, region) {
   return `${showId}:${region}`;
@@ -107,21 +99,69 @@ function readAvailabilityCache(showId, region) {
     availabilityCache.delete(availabilityCacheKey(showId, region));
     return null;
   }
-  return entry.value;
+  return { ...entry.value, cached: true };
 }
 
-function writeAvailabilityCache(showId, region, value) {
+function writeAvailabilityCache(showId, region, value, ttlMs = AVAILABILITY_TTL_MS) {
   availabilityCache.set(availabilityCacheKey(showId, region), {
-    expiresAt: Date.now() + AVAILABILITY_TTL_MS,
+    expiresAt: Date.now() + ttlMs,
     value,
   });
   return value;
 }
 
+function streamingOptionToProvider(option) {
+  const service = option?.service || {};
+  const link = option?.link || option?.videoLink || service?.homePage || null;
+  return {
+    name: normalizeProviderName(service?.name || service?.id || 'Provider'),
+    type: option?.type || 'subscription',
+    webUrl: link,
+    iosUrl: link,
+    androidUrl: link,
+    format: option?.quality || null,
+    price: option?.price?.amount ?? null,
+  };
+}
+
+function dedupeProviders(providers) {
+  const seen = new Set();
+  return providers.filter((provider) => {
+    const key = `${provider.name}|${provider.type}|${provider.webUrl || ''}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+async function streamingAvailabilityShow(imdbId, region) {
+  const url = new URL(`https://api.movieofthenight.com/v4/shows/${encodeURIComponent(imdbId)}`);
+  url.searchParams.set('country', String(region).toLowerCase());
+
+  const response = await fetch(url, {
+    headers: {
+      'X-API-Key': streamingAvailabilityKey,
+      'Accept': 'application/json',
+      'User-Agent': 'ForFlickSakes/2.0',
+    },
+    signal: AbortSignal.timeout(12000),
+  });
+
+  if (response.status === 404) return { kind: 'not-found' };
+  if (response.status === 429) return { kind: 'quota' };
+  if (!response.ok) {
+    const error = new Error(`Streaming Availability API returned ${response.status}`);
+    error.status = response.status;
+    throw error;
+  }
+
+  return { kind: 'ok', data: await response.json() };
+}
+
 async function resolveAvailability({ showId, region }) {
-  const normalizedRegion = String(region || '').toUpperCase();
+  const normalizedRegion = String(region || 'ZA').toUpperCase();
   const cached = readAvailabilityCache(showId, normalizedRegion);
-  if (cached) return { ...cached, cached: true };
+  if (cached) return cached;
 
   if (!SUPPORTED_AVAILABILITY_REGIONS.has(normalizedRegion)) {
     return writeAvailabilityCache(showId, normalizedRegion, {
@@ -130,22 +170,107 @@ async function resolveAvailability({ showId, region }) {
       status: 'unsupported-region',
       verified: false,
       providers: [],
-      attribution: 'ForFlickSakes availability resolver',
+      attribution: 'Streaming availability by Streaming Availability API (Movie of the Night).',
       message: 'Streaming availability is not yet supported for this region.',
-      evidence: [],
-    });
+    }, AVAILABILITY_NEGATIVE_TTL_MS);
   }
 
-  return writeAvailabilityCache(showId, normalizedRegion, {
-    region: normalizedRegion,
-    checkedAt: new Date().toISOString(),
-    status: 'unconfirmed',
-    verified: false,
-    providers: [],
-    attribution: 'ForFlickSakes availability resolver',
-    message: 'Availability could not be legally verified from a free permitted source yet.',
-    evidence: [],
-  });
+  if (!streamingAvailabilityKey) {
+    return {
+      region: normalizedRegion,
+      checkedAt: new Date().toISOString(),
+      status: 'not-configured',
+      verified: false,
+      providers: [],
+      attribution: 'Streaming availability by Streaming Availability API (Movie of the Night).',
+      message: 'Streaming availability service is not configured.',
+    };
+  }
+
+  const key = availabilityCacheKey(showId, normalizedRegion);
+  if (availabilityInFlight.has(key)) return availabilityInFlight.get(key);
+
+  const task = (async () => {
+    const show = await tvMazeShow(showId);
+    const imdbId = show?.externals?.imdb;
+
+    if (!imdbId) {
+      return writeAvailabilityCache(showId, normalizedRegion, {
+        region: normalizedRegion,
+        checkedAt: new Date().toISOString(),
+        status: 'unconfirmed',
+        verified: false,
+        providers: [],
+        attribution: 'Streaming availability by Streaming Availability API (Movie of the Night).',
+        message: 'This title does not have an IMDb identifier, so availability could not be verified.',
+      }, AVAILABILITY_NEGATIVE_TTL_MS);
+    }
+
+    try {
+      const external = await streamingAvailabilityShow(imdbId, normalizedRegion);
+
+      if (external.kind === 'quota') {
+        return {
+          region: normalizedRegion,
+          checkedAt: new Date().toISOString(),
+          status: 'quota-limited',
+          verified: false,
+          providers: [],
+          attribution: 'Streaming availability by Streaming Availability API (Movie of the Night).',
+          message: 'Streaming availability is temporarily unavailable. Recommendations and the rest of ForFlickSakes still work normally.',
+        };
+      }
+
+      if (external.kind === 'not-found') {
+        return writeAvailabilityCache(showId, normalizedRegion, {
+          region: normalizedRegion,
+          checkedAt: new Date().toISOString(),
+          status: 'unconfirmed',
+          verified: false,
+          providers: [],
+          attribution: 'Streaming availability by Streaming Availability API (Movie of the Night).',
+          message: `No verified streaming availability was returned for ${normalizedRegion}.`,
+        }, AVAILABILITY_NEGATIVE_TTL_MS);
+      }
+
+      const options = external.data?.streamingOptions?.[normalizedRegion.toLowerCase()]
+        || external.data?.streamingOptions?.[normalizedRegion]
+        || [];
+      const providers = dedupeProviders(
+        (Array.isArray(options) ? options : [])
+          .map(streamingOptionToProvider)
+          .filter((provider) => provider.name && provider.webUrl),
+      );
+
+      return writeAvailabilityCache(showId, normalizedRegion, {
+        region: normalizedRegion,
+        checkedAt: new Date().toISOString(),
+        status: providers.length ? 'verified' : 'unavailable',
+        verified: providers.length > 0,
+        providers,
+        attribution: 'Streaming availability by Streaming Availability API (Movie of the Night).',
+        message: providers.length ? null : `No streaming option was returned for ${normalizedRegion}.`,
+      }, providers.length ? AVAILABILITY_TTL_MS : AVAILABILITY_NEGATIVE_TTL_MS);
+    } catch (error) {
+      console.error('Streaming availability lookup failed:', error);
+      return {
+        region: normalizedRegion,
+        checkedAt: new Date().toISOString(),
+        status: 'temporarily-unavailable',
+        verified: false,
+        providers: [],
+        attribution: 'Streaming availability by Streaming Availability API (Movie of the Night).',
+        message: 'Streaming availability is temporarily unavailable. Try again later.',
+      };
+    }
+  })();
+
+  availabilityInFlight.set(key, task);
+  try {
+    return await task;
+  } finally {
+    availabilityInFlight.delete(key);
+  }
 }
 
 let catalogueCache = { expiresAt: 0, shows: [] };
@@ -490,28 +615,6 @@ async function moodCandidates(mood) {
     }));
 }
 
-async function watchmodeTitleId(imdbId, title) {
-  if (!watchmodeKey) return null;
-  const url = new URL('https://api.watchmode.com/v1/search/');
-  url.searchParams.set('apiKey', watchmodeKey);
-  url.searchParams.set('search_field', imdbId ? 'imdb_id' : 'name');
-  url.searchParams.set('search_value', imdbId || title);
-  const response = await fetch(url);
-  if (!response.ok) return null;
-  const data = await response.json();
-  return data?.title_results?.[0]?.id || null;
-}
-
-async function watchmodeSources(titleId, region) {
-  if (!watchmodeKey || !titleId) return [];
-  const url = new URL(`https://api.watchmode.com/v1/title/${titleId}/sources/`);
-  url.searchParams.set('apiKey', watchmodeKey);
-  url.searchParams.set('regions', region || 'ZA');
-  const response = await fetch(url);
-  if (!response.ok) return [];
-  const data = await response.json();
-  return Array.isArray(data) ? data : [];
-}
 
 
 async function enrichReferenceV2(intent) {
@@ -636,7 +739,7 @@ app.get('/health', (_request, response) => {
     ok: true,
     catalogue: 'TVMaze',
     recommendationModes: ['prompt', 'mood'],
-    providers: 'resolver-foundation',
+    providers: streamingAvailabilityKey ? 'streaming-availability-api' : 'not-configured',
     feedbackEvents: feedbackEvents.length,
   });
 });
@@ -709,6 +812,15 @@ app.post('/feedback', (request, response) => {
   response.status(202).json({ ok: true });
 });
 
+function normalizeProviderName(name = '') {
+  const value = String(name).trim();
+  if (!value) return value;
+  const lower = value.toLowerCase();
+  if (lower === 'max' || lower === 'hbo max') return 'HBO Max';
+  if (lower === 'amazon prime video' || lower === 'prime video') return 'Prime Video';
+  if (lower === 'apple tv' || lower === 'apple tv plus' || lower === 'apple tv+') return 'Apple TV+';
+  return value;
+}
 
 
 app.get('/shows/:id/details', async (request, response) => {
@@ -739,26 +851,25 @@ app.get('/shows/:id/details', async (request, response) => {
   }
 });
 
-app.get('/shows/:id/providers', async (req, res) => {
+app.get('/shows/:id/providers', async (request, response) => {
   try {
-    const showId = Number(req.params.id);
-    const region = String(req.query.region || 'ZA').toUpperCase();
+    const showId = Number(request.params.id);
+    const region = String(request.query.region || 'ZA').toUpperCase();
     if (!Number.isFinite(showId) || showId <= 0) {
-      return res.status(400).json({ error: 'Invalid show id.' });
+      return response.status(400).json({ error: 'Invalid show id.' });
     }
     const result = await resolveAvailability({ showId, region });
-    return res.json(result);
+    return response.json(result);
   } catch (error) {
-    console.error('Availability resolver failed:', error);
-    return res.status(500).json({
-      region: String(req.query.region || 'ZA').toUpperCase(),
+    console.error('Provider resolver failed:', error);
+    return response.status(500).json({
+      region: String(request.query.region || 'ZA').toUpperCase(),
       checkedAt: new Date().toISOString(),
       status: 'error',
       verified: false,
       providers: [],
-      attribution: 'ForFlickSakes availability resolver',
+      attribution: 'Streaming availability by Streaming Availability API (Movie of the Night).',
       message: 'Availability check failed.',
-      evidence: [],
     });
   }
 });

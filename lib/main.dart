@@ -2195,8 +2195,6 @@ class ProfilePage extends StatelessWidget {
           ],
           const SizedBox(height: 30),
           Text('Streaming region', style: Theme.of(context).textTheme.titleLarge),
-          const SizedBox(height: 6),
-          const Text('Availability resolver covers South Africa, the UK, the US and EU countries individually.', style: TextStyle(color: Color(0xFF9893A3))),
           const SizedBox(height: 12),
           DropdownButtonFormField<String>(
             initialValue: region,
