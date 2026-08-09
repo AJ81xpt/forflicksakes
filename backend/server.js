@@ -1,4 +1,4 @@
-import 'dotenv/config';
+﻿import 'dotenv/config';
 import cors from 'cors';
 import express from 'express';
 import { knownMoods, looksLikeTitleLookup, moodLabel, normalizeTitle, parsePrompt as parsePromptV2, scoreMood as scoreMoodV2, scorePrompt as scorePromptV2, showProfile as showProfileV2 } from './recommendation_engine.js';
@@ -709,9 +709,6 @@ app.post('/feedback', (request, response) => {
   response.status(202).json({ ok: true });
 });
 
-function normalizeProviderName(name) {
-  return name === 'Max' ? 'HBO Max' : name;
-}
 
 
 app.get('/shows/:id/details', async (request, response) => {
