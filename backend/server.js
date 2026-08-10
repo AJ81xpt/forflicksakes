@@ -79,7 +79,9 @@ const genericQueryWords = new Set([
 const availabilityCache = new Map();
 const availabilityInFlight = new Map();
 const AVAILABILITY_TTL_MS = 7 * 24 * 60 * 60 * 1000;
-const AVAILABILITY_NEGATIVE_TTL_MS = 24 * 60 * 60 * 1000;
+const AVAILABILITY_NEGATIVE_TTL_MS = 5 * 60 * 1000;
+const AVAILABILITY_STALE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+const availabilityLastVerified = new Map();
 
 const SUPPORTED_AVAILABILITY_REGIONS = new Set([
   'ZA', 'GB', 'US',
@@ -108,6 +110,46 @@ function writeAvailabilityCache(showId, region, value, ttlMs = AVAILABILITY_TTL_
     value,
   });
   return value;
+}
+
+function rememberVerifiedAvailability(showId, region, value) {
+  if (!value?.providers?.length) return value;
+  availabilityLastVerified.set(availabilityCacheKey(showId, region), {
+    expiresAt: Date.now() + AVAILABILITY_STALE_TTL_MS,
+    value: { ...value, cached: false },
+  });
+  return value;
+}
+
+function readLastVerifiedAvailability(showId, region) {
+  const key = availabilityCacheKey(showId, region);
+  const entry = availabilityLastVerified.get(key);
+  if (!entry) return null;
+  if (entry.expiresAt <= Date.now()) {
+    availabilityLastVerified.delete(key);
+    return null;
+  }
+  return {
+    ...entry.value,
+    status: 'verified-stale',
+    verified: true,
+    stale: true,
+    message: 'Showing the last verified streaming availability while the provider refreshes.',
+  };
+}
+
+function availabilityFallback(showId, region, message) {
+  const stale = readLastVerifiedAvailability(showId, region);
+  if (stale) return stale;
+  return {
+    region,
+    checkedAt: new Date().toISOString(),
+    status: 'unconfirmed',
+    verified: false,
+    providers: [],
+    attribution: 'Streaming availability by Streaming Availability API (Movie of the Night).',
+    message,
+  };
 }
 
 function streamingOptionToProvider(option) {
@@ -154,6 +196,7 @@ function dedupeProviders(providers) {
 async function streamingAvailabilityShow(imdbId, region) {
   const url = new URL(`https://api.movieofthenight.com/v4/shows/${encodeURIComponent(imdbId)}`);
   url.searchParams.set('country', String(region).toLowerCase());
+  url.searchParams.set('series_granularity', 'show');
 
   const response = await fetch(url, {
     headers: {
@@ -164,6 +207,7 @@ async function streamingAvailabilityShow(imdbId, region) {
     signal: AbortSignal.timeout(12000),
   });
 
+  if (response.status === 401 || response.status === 403) return { kind: 'auth' };
   if (response.status === 404) return { kind: 'not-found' };
   if (response.status === 429) return { kind: 'quota' };
   if (!response.ok) {
@@ -226,28 +270,31 @@ async function resolveAvailability({ showId, region }) {
     try {
       const external = await streamingAvailabilityShow(imdbId, normalizedRegion);
 
+      if (external.kind === 'auth') {
+        return availabilityFallback(
+          showId,
+          normalizedRegion,
+          'Streaming availability could not be verified because the provider rejected authentication.',
+        );
+      }
+
       if (external.kind === 'quota') {
-        return {
-          region: normalizedRegion,
-          checkedAt: new Date().toISOString(),
-          status: 'quota-limited',
-          verified: false,
-          providers: [],
-          attribution: 'Streaming availability by Streaming Availability API (Movie of the Night).',
-          message: 'Streaming availability is temporarily unavailable. Recommendations and the rest of ForFlickSakes still work normally.',
-        };
+        return availabilityFallback(
+          showId,
+          normalizedRegion,
+          'Streaming availability is temporarily rate limited. Try again shortly.',
+        );
       }
 
       if (external.kind === 'not-found') {
-        return writeAvailabilityCache(showId, normalizedRegion, {
-          region: normalizedRegion,
-          checkedAt: new Date().toISOString(),
-          status: 'unconfirmed',
-          verified: false,
-          providers: [],
-          attribution: 'Streaming availability by Streaming Availability API (Movie of the Night).',
-          message: `No verified streaming availability was returned for ${normalizedRegion}.`,
-        }, AVAILABILITY_NEGATIVE_TTL_MS);
+        const result = availabilityFallback(
+          showId,
+          normalizedRegion,
+          `No verified streaming availability was returned for ${normalizedRegion}.`,
+        );
+        return result.stale
+          ? result
+          : writeAvailabilityCache(showId, normalizedRegion, result, AVAILABILITY_NEGATIVE_TTL_MS);
       }
 
       const options = external.data?.streamingOptions?.[normalizedRegion.toLowerCase()]
@@ -259,26 +306,40 @@ async function resolveAvailability({ showId, region }) {
           .filter((provider) => provider.name && provider.webUrl),
       );
 
-      return writeAvailabilityCache(showId, normalizedRegion, {
+      if (!providers.length) {
+        const result = availabilityFallback(
+          showId,
+          normalizedRegion,
+          `Streaming availability could not be verified for ${normalizedRegion}.`,
+        );
+        return result.stale
+          ? result
+          : writeAvailabilityCache(showId, normalizedRegion, result, AVAILABILITY_NEGATIVE_TTL_MS);
+      }
+
+      const verifiedResult = {
         region: normalizedRegion,
         checkedAt: new Date().toISOString(),
-        status: providers.length ? 'verified' : 'unavailable',
-        verified: providers.length > 0,
+        status: 'verified',
+        verified: true,
         providers,
         attribution: 'Streaming availability by Streaming Availability API (Movie of the Night).',
-        message: providers.length ? null : `No streaming option was returned for ${normalizedRegion}.`,
-      }, providers.length ? AVAILABILITY_TTL_MS : AVAILABILITY_NEGATIVE_TTL_MS);
+        message: null,
+      };
+      rememberVerifiedAvailability(showId, normalizedRegion, verifiedResult);
+      return writeAvailabilityCache(
+        showId,
+        normalizedRegion,
+        verifiedResult,
+        AVAILABILITY_TTL_MS,
+      );
     } catch (error) {
       console.error('Streaming availability lookup failed:', error);
-      return {
-        region: normalizedRegion,
-        checkedAt: new Date().toISOString(),
-        status: 'temporarily-unavailable',
-        verified: false,
-        providers: [],
-        attribution: 'Streaming availability by Streaming Availability API (Movie of the Night).',
-        message: 'Streaming availability is temporarily unavailable. Try again later.',
-      };
+      return availabilityFallback(
+        showId,
+        normalizedRegion,
+        'Streaming availability is temporarily unavailable. Try again later.',
+      );
     }
   })();
 
@@ -986,6 +1047,20 @@ app.get('/shows/:id/details', async (request, response) => {
     console.error(error);
     response.status(502).json({ error: 'Show details lookup failed.' });
   }
+});
+
+app.post('/availability/cache/clear', (_request, response) => {
+  availabilityCache.clear();
+  response.json({ ok: true, cleared: true });
+});
+
+app.get('/availability/debug', (_request, response) => {
+  response.json({
+    provider: 'movie-of-the-night',
+    configured: Boolean(streamingAvailabilityKey),
+    negativeCacheMinutes: Math.round(AVAILABILITY_NEGATIVE_TTL_MS / 60000),
+    rememberedVerifiedEntries: availabilityLastVerified.size,
+  });
 });
 
 app.get('/shows/:id/providers', async (request, response) => {
