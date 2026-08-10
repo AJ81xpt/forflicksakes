@@ -216,7 +216,11 @@ async function streamingAvailabilityShow(imdbId, region) {
     throw error;
   }
 
-  return { kind: 'ok', data: await response.json() };
+  const data = await response.json();
+
+  console.log('[MOVIE-OF-THE-NIGHT RAW]', JSON.stringify(data, null, 2));
+
+  return { kind: 'ok', data };
 }
 
 async function resolveAvailability({ showId, region }) {
