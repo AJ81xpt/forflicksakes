@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url';
 import 'dotenv/config';
 import cors from 'cors';
 import express from 'express';
@@ -1090,6 +1091,12 @@ app.get('/shows/:id/providers', async (request, response) => {
   }
 });
 
+
+app.get('/privacy', (req, res) => {
+  res.sendFile(fileURLToPath(new URL('./privacy.html', import.meta.url)));
+});
 app.listen(port, '0.0.0.0', () => {
   console.log(`ForFlickSakes live backend running on http://localhost:${port}`);
 });
+
+
