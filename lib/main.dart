@@ -9,115 +9,6 @@ import 'services/api_service.dart';
 import 'services/personalization_store.dart';
 
 
-const _ffsLanguages = <String, String>{
-  'en': 'English',
-  'pt': 'Português',
-  'es': 'Español',
-  'fr': 'Français',
-  'de': 'Deutsch',
-};
-
-const _ffsText = <String, Map<String, String>>{
-  'en': {
-    'discover': 'Discover',
-    'forYou': 'For You',
-    'watchlist': 'Watchlist',
-    'profile': 'Profile',
-    'concierge': 'YOUR WATCH CONCIERGE',
-    'brand': 'FOR FLICK SAKES.',
-    'stop': 'Stop scrolling.\nStart watching.',
-    'browse': 'Browse a mood for instant inspiration, or describe your perfect watch for precise picks.',
-    'forYouTag': 'Because your taste is starting to show.',
-    'watchlistEmpty': 'For Flick Sakes... save something worth watching.',
-    'profileTitle': 'Profile & taste',
-    'streamingRegion': 'Streaming region',
-    'streamingServices': 'Streaming services',
-    'language': 'App language',
-    'stored': 'Stored on this device',
-    'storedBody': 'Your preferences, watch history and watchlist stay on this device.',
-    'reset': 'Reset personalisation',
-  },
-  'pt': {
-    'discover': 'Descobrir',
-    'forYou': 'Para ti',
-    'watchlist': 'Lista',
-    'profile': 'Perfil',
-    'concierge': 'O TEU CONCIERGE DE SÉRIES',
-    'brand': 'FOR FLICK SAKES.',
-    'stop': 'Para de procurar.\nComeça a ver.',
-    'browse': 'Escolhe um estado de espírito ou descreve exatamente o que queres ver.',
-    'forYouTag': 'Porque o teu gosto começa a aparecer.',
-    'watchlistEmpty': 'For Flick Sakes... guarda algo que valha a pena ver.',
-    'profileTitle': 'Perfil e preferências',
-    'streamingRegion': 'Região de streaming',
-    'streamingServices': 'Serviços de streaming',
-    'language': 'Idioma da aplicação',
-    'stored': 'Guardado neste dispositivo',
-    'storedBody': 'As tuas preferências, histórico e lista ficam neste dispositivo.',
-    'reset': 'Repor personalização',
-  },
-  'es': {
-    'discover': 'Descubrir',
-    'forYou': 'Para ti',
-    'watchlist': 'Mi lista',
-    'profile': 'Perfil',
-    'concierge': 'TU CONCIERGE DE SERIES',
-    'brand': 'FOR FLICK SAKES.',
-    'stop': 'Deja de buscar.\nEmpieza a ver.',
-    'browse': 'Elige un estado de ánimo o describe exactamente qué quieres ver.',
-    'forYouTag': 'Porque tu gusto ya empieza a notarse.',
-    'watchlistEmpty': 'For Flick Sakes... guarda algo que merezca la pena.',
-    'profileTitle': 'Perfil y preferencias',
-    'streamingRegion': 'Región de streaming',
-    'streamingServices': 'Servicios de streaming',
-    'language': 'Idioma de la aplicación',
-    'stored': 'Guardado en este dispositivo',
-    'storedBody': 'Tus preferencias, historial y lista se guardan en este dispositivo.',
-    'reset': 'Restablecer personalización',
-  },
-  'fr': {
-    'discover': 'Découvrir',
-    'forYou': 'Pour vous',
-    'watchlist': 'Ma liste',
-    'profile': 'Profil',
-    'concierge': 'VOTRE CONCIERGE SÉRIES',
-    'brand': 'FOR FLICK SAKES.',
-    'stop': 'Arrêtez de chercher.\nCommencez à regarder.',
-    'browse': 'Choisissez une humeur ou décrivez exactement ce que vous voulez regarder.',
-    'forYouTag': 'Parce que vos goûts commencent à se dessiner.',
-    'watchlistEmpty': 'For Flick Sakes... gardez quelque chose qui vaut le détour.',
-    'profileTitle': 'Profil et préférences',
-    'streamingRegion': 'Région de streaming',
-    'streamingServices': 'Services de streaming',
-    'language': 'Langue de l’application',
-    'stored': 'Stocké sur cet appareil',
-    'storedBody': 'Vos préférences, historique et liste restent sur cet appareil.',
-    'reset': 'Réinitialiser la personnalisation',
-  },
-  'de': {
-    'discover': 'Entdecken',
-    'forYou': 'Für dich',
-    'watchlist': 'Merkliste',
-    'profile': 'Profil',
-    'concierge': 'DEIN SERIEN-CONCIERGE',
-    'brand': 'FOR FLICK SAKES.',
-    'stop': 'Hör auf zu suchen.\nFang an zu schauen.',
-    'browse': 'Wähle eine Stimmung oder beschreibe genau, was du sehen möchtest.',
-    'forYouTag': 'Weil dein Geschmack langsam sichtbar wird.',
-    'watchlistEmpty': 'For Flick Sakes... speichere etwas, das sich lohnt.',
-    'profileTitle': 'Profil und Vorlieben',
-    'streamingRegion': 'Streaming-Region',
-    'streamingServices': 'Streaming-Dienste',
-    'language': 'App-Sprache',
-    'stored': 'Auf diesem Gerät gespeichert',
-    'storedBody': 'Vorlieben, Verlauf und Merkliste bleiben auf diesem Gerät.',
-    'reset': 'Personalisierung zurücksetzen',
-  },
-};
-
-String _t(String languageCode, String key) =>
-    _ffsText[languageCode]?[key] ?? _ffsText['en']![key] ?? key;
-
 void main() => runApp(const ForFlickSakesApp());
 
 class ForFlickSakesApp extends StatelessWidget {
@@ -182,7 +73,6 @@ class _AppShellState extends State<AppShell> {
   Set<String> _services = <String>{'Netflix', 'Prime Video', 'HBO Max', 'Showmax'};
   int _maxSeasons = 3;
   bool _completedOnly = false;
-  String _appLanguage = 'en';
   Set<int> _saved = <int>{};
   Set<int> _dismissed = <int>{};
   Set<int> _watched = <int>{};
@@ -208,7 +98,6 @@ class _AppShellState extends State<AppShell> {
       _watched = snapshot.watchedIds;
       _feedbackCounts = snapshot.feedbackCounts;
       _knownShows = snapshot.knownShows;
-      _appLanguage = snapshot.appLanguage;
       _loadingProfile = false;
     });
   }
@@ -251,7 +140,6 @@ class _AppShellState extends State<AppShell> {
   Widget build(BuildContext context) {
     final pages = <Widget>[
       DiscoverPage(
-        languageCode: _appLanguage,
         saved: _saved,
         region: _region,
         services: _services,
@@ -263,7 +151,6 @@ class _AppShellState extends State<AppShell> {
         onShowsSeen: _rememberShows,
       ),
       ForYouPage(
-        languageCode: _appLanguage,
         saved: _saved,
         watched: _watched,
         dismissed: _dismissed,
@@ -277,7 +164,6 @@ class _AppShellState extends State<AppShell> {
         onShowsSeen: _rememberShows,
       ),
       WatchlistPage(
-        languageCode: _appLanguage,
         saved: _saved,
         knownShows: _knownShows,
         region: _region,
@@ -285,11 +171,6 @@ class _AppShellState extends State<AppShell> {
         onFeedback: _recordLocalFeedback,
       ),
       ProfilePage(
-        languageCode: _appLanguage,
-        onLanguageChanged: (value) {
-          setState(() => _appLanguage = value);
-          _personalization.saveAppLanguage(value);
-        },
         region: _region,
         services: _services,
         maxSeasons: _maxSeasons,
@@ -336,26 +217,26 @@ class _AppShellState extends State<AppShell> {
             indicatorColor: const Color(0xFF352A82),
             selectedIndex: _index,
             onDestinationSelected: (value) => setState(() => _index = value),
-            destinations: [
+            destinations: const [
               NavigationDestination(
                 icon: Icon(Icons.auto_awesome_outlined),
                 selectedIcon: Icon(Icons.auto_awesome_rounded),
-                label: _t(_appLanguage, 'discover'),
+                label: 'Discover',
               ),
               NavigationDestination(
                 icon: Icon(Icons.favorite_outline_rounded),
                 selectedIcon: Icon(Icons.favorite_rounded),
-                label: _t(_appLanguage, 'forYou'),
+                label: 'For You',
               ),
               NavigationDestination(
                 icon: Icon(Icons.bookmark_border_rounded),
                 selectedIcon: Icon(Icons.bookmark_rounded),
-                label: _t(_appLanguage, 'watchlist'),
+                label: 'Watchlist',
               ),
               NavigationDestination(
                 icon: Icon(Icons.person_outline_rounded),
                 selectedIcon: Icon(Icons.person_rounded),
-                label: _t(_appLanguage, 'profile'),
+                label: 'Profile',
               ),
             ],
           ),
@@ -367,7 +248,6 @@ class _AppShellState extends State<AppShell> {
 
 class DiscoverPage extends StatefulWidget {
   const DiscoverPage({
-    required this.languageCode,
     required this.saved,
     required this.region,
     required this.services,
@@ -380,7 +260,6 @@ class DiscoverPage extends StatefulWidget {
     super.key,
   });
 
-  final String languageCode;
   final Set<int> saved;
   final String region;
   final Set<String> services;
@@ -685,7 +564,7 @@ class _DiscoverPageState extends State<DiscoverPage> {
               children: [
                 const _BrandHeader(),
                 const SizedBox(height: 36),
-                _ConciergePanel(languageCode: widget.languageCode),
+                const _ConciergePanel(),
                 const SizedBox(height: 28),
                 Text(
                   'Describe your perfect watch',
@@ -1059,8 +938,7 @@ class _BrandHeader extends StatelessWidget {
 }
 
 class _ConciergePanel extends StatelessWidget {
-  const _ConciergePanel({required this.languageCode});
-  final String languageCode;
+  const _ConciergePanel();
 
   @override
   Widget build(BuildContext context) {
@@ -1357,6 +1235,7 @@ class _ShowDetailPageState extends State<ShowDetailPage> {
     setState(() {
       _loadingOptions = true;
       _optionsError = null;
+      _options = null;
     });
     try {
       final options = await _api.watchOptions(showId: widget.show.id, region: widget.region);
@@ -1365,11 +1244,14 @@ class _ShowDetailPageState extends State<ShowDetailPage> {
         _options = options;
         _loadingOptions = false;
       });
-    } catch (_) {
+    } catch (error) {
       if (!mounted) return;
       setState(() {
         _loadingOptions = false;
-        _optionsError = 'Viewing options could not be loaded.';
+        _optionsError = error
+            .toString()
+            .replaceFirst('Exception: ', '')
+            .trim();
       });
     }
   }
@@ -1420,15 +1302,35 @@ class _ShowDetailPageState extends State<ShowDetailPage> {
       if (Platform.isIOS) provider.iosUrl,
       if (Platform.isAndroid) provider.androidUrl,
       provider.webUrl,
-    ].whereType<String>();
+      provider.iosUrl,
+      provider.androidUrl,
+    ]
+        .whereType<String>()
+        .map((value) => value.trim())
+        .where((value) => value.isNotEmpty)
+        .toSet();
 
     for (final value in candidates) {
       final uri = Uri.tryParse(value);
-      if (uri == null) continue;
-      if (await launchUrl(uri, mode: LaunchMode.externalApplication)) return;
+      if (uri == null || !(uri.isScheme('https') || uri.isScheme('http'))) {
+        continue;
+      }
+
+      try {
+        if (await launchUrl(uri, mode: LaunchMode.externalApplication)) return;
+      } catch (_) {
+        try {
+          if (await launchUrl(uri, mode: LaunchMode.platformDefault)) return;
+        } catch (_) {
+          // Try the next URL.
+        }
+      }
     }
+
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${provider.name} could not be opened.')));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('${provider.name} could not be opened.')),
+    );
   }
 
   Future<void> _shareShow(BuildContext shareContext) async {
@@ -1451,17 +1353,37 @@ class _ShowDetailPageState extends State<ShowDetailPage> {
   }
 
   String _providerSubtitle(WatchProvider provider) {
-    final parts = <String>[
-      provider.type.replaceAll('_', ' '),
-      if (provider.format?.isNotEmpty ?? false) provider.format!,
+    final type = provider.type.toLowerCase();
+    final access = type.contains('subscription')
+        ? 'Included with subscription'
+        : type.contains('addon')
+            ? 'Available via add-on'
+            : type.contains('free')
+                ? 'Free to watch'
+                : type.contains('rent')
+                    ? 'Available to rent'
+                    : type.contains('buy') || type.contains('purchase')
+                        ? 'Available to buy'
+                        : 'Streaming option';
+
+    final details = <String>[
+      access,
+      if (provider.format?.trim().isNotEmpty ?? false)
+        provider.format!.trim().toUpperCase(),
       if (provider.price != null) provider.price.toString(),
     ];
-    return parts.join(' · ');
+
+    return details.join(' · ');
   }
 
   Map<String, List<WatchProvider>> _providerGroups(List<WatchProvider> providers) {
     final groups = <String, List<WatchProvider>>{};
+    final seen = <String>{};
+
     for (final provider in providers) {
+      final key = '${provider.name.toLowerCase()}|${provider.type.toLowerCase()}';
+      if (!seen.add(key)) continue;
+
       final raw = provider.type.toLowerCase();
       final label = raw.contains('free')
           ? 'Free'
@@ -1469,9 +1391,13 @@ class _ShowDetailPageState extends State<ShowDetailPage> {
               ? 'Rent'
               : raw.contains('buy') || raw.contains('purchase')
                   ? 'Buy'
-                  : 'Stream';
+                  : raw.contains('addon')
+                      ? 'Add-ons'
+                      : 'Included with subscription';
+
       groups.putIfAbsent(label, () => <WatchProvider>[]).add(provider);
     }
+
     return groups;
   }
 
@@ -1858,7 +1784,6 @@ class _Poster extends StatelessWidget {
 
 class ForYouPage extends StatefulWidget {
   const ForYouPage({
-    required this.languageCode,
     required this.saved,
     required this.watched,
     required this.dismissed,
@@ -1873,7 +1798,6 @@ class ForYouPage extends StatefulWidget {
     super.key,
   });
 
-  final String languageCode;
   final Set<int> saved;
   final Set<int> watched;
   final Set<int> dismissed;
@@ -2027,10 +1951,10 @@ class _ForYouPageState extends State<ForYouPage> {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(24, 28, 24, 120),
           children: [
-            Text(_t(widget.languageCode, 'forYou'), style: Theme.of(context).textTheme.headlineLarge),
+            Text('For You', style: Theme.of(context).textTheme.headlineLarge),
             const SizedBox(height: 8),
             Text(
-              _t(widget.languageCode, 'forYouTag'),
+              'Because your taste is starting to show.',
               style: TextStyle(color: Color(0xFFD7B8FF), fontSize: 16, fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 10),
@@ -2178,7 +2102,6 @@ class _ForYouError extends StatelessWidget {
 
 class WatchlistPage extends StatelessWidget {
   const WatchlistPage({
-    required this.languageCode,
     required this.saved,
     required this.knownShows,
     required this.region,
@@ -2187,7 +2110,6 @@ class WatchlistPage extends StatelessWidget {
     super.key,
   });
 
-  final String languageCode;
   final Set<int> saved;
   final Map<int, ShowItem> knownShows;
   final String region;
@@ -2205,7 +2127,7 @@ class WatchlistPage extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(_t(languageCode, 'watchlist'), style: Theme.of(context).textTheme.headlineLarge),
+            Text('Watchlist', style: Theme.of(context).textTheme.headlineLarge),
             const SizedBox(height: 10),
             Text(saved.isEmpty ? 'Save a recommendation and it will appear here.' : '${saved.length} saved ${saved.length == 1 ? 'title' : 'titles'}'),
             const SizedBox(height: 22),
@@ -2217,7 +2139,7 @@ class WatchlistPage extends StatelessWidget {
                     children: [
                       Icon(Icons.bookmark_border_rounded, size: 52, color: Color(0xFFD7B8FF)),
                       SizedBox(height: 14),
-                      Text(_t(languageCode, 'watchlistEmpty'), style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800), textAlign: TextAlign.center),
+                      Text('For Flick Sakes... save something worth watching.', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800), textAlign: TextAlign.center),
                       SizedBox(height: 8),
                       Text('Save picks from Discover to keep them here.', textAlign: TextAlign.center),
                     ],
@@ -2256,8 +2178,6 @@ class WatchlistPage extends StatelessWidget {
 
 class ProfilePage extends StatelessWidget {
   const ProfilePage({
-    required this.languageCode,
-    required this.onLanguageChanged,
     required this.region,
     required this.services,
     required this.maxSeasons,
@@ -2273,8 +2193,6 @@ class ProfilePage extends StatelessWidget {
     super.key,
   });
 
-  final String languageCode;
-  final ValueChanged<String> onLanguageChanged;
   final String region;
   final Set<String> services;
   final int maxSeasons;
@@ -2305,7 +2223,7 @@ class ProfilePage extends StatelessWidget {
       child: ListView(
         padding: const EdgeInsets.fromLTRB(24, 28, 24, 110),
         children: [
-          Text(_t(languageCode, 'profileTitle'), style: Theme.of(context).textTheme.headlineLarge),
+          Text('Profile & taste', style: Theme.of(context).textTheme.headlineLarge),
           const SizedBox(height: 8),
           const Text('Your choices now stay on this device and shape future recommendations.'),
           const SizedBox(height: 24),
@@ -2325,27 +2243,7 @@ class ProfilePage extends StatelessWidget {
             ),
           ],
           const SizedBox(height: 30),
-          Text(_t(languageCode, 'language'), style: Theme.of(context).textTheme.titleLarge),
-          const SizedBox(height: 12),
-          DropdownButtonFormField<String>(
-            value: languageCode,
-            decoration: const InputDecoration(
-              filled: true,
-              fillColor: Color(0xFF15111D),
-              prefixIcon: Icon(Icons.translate_rounded),
-            ),
-            items: _ffsLanguages.entries
-                .map((entry) => DropdownMenuItem<String>(
-                      value: entry.key,
-                      child: Text(entry.value),
-                    ))
-                .toList(),
-            onChanged: (value) {
-              if (value != null) onLanguageChanged(value);
-            },
-          ),
-          const SizedBox(height: 30),
-          Text(_t(languageCode, 'streamingRegion'), style: Theme.of(context).textTheme.titleLarge),
+          Text('Streaming region', style: Theme.of(context).textTheme.titleLarge),
           const SizedBox(height: 12),
           DropdownButtonFormField<String>(
             initialValue: region,
@@ -2354,7 +2252,7 @@ class ProfilePage extends StatelessWidget {
             onChanged: (value) { if (value != null) onRegionChanged(value); },
           ),
           const SizedBox(height: 30),
-          Text(_t(languageCode, 'streamingServices'), style: Theme.of(context).textTheme.titleLarge),
+          Text('Streaming services', style: Theme.of(context).textTheme.titleLarge),
           const SizedBox(height: 8),
           const Text('These choices are saved across restarts.'),
           const SizedBox(height: 14),
@@ -2390,7 +2288,7 @@ class ProfilePage extends StatelessWidget {
           ListTile(
             contentPadding: EdgeInsets.zero,
             leading: const Icon(Icons.restart_alt_rounded),
-            title: Text(_t(languageCode, 'reset')),
+            title: Text('Reset personalisation'),
             subtitle: const Text('Clear saved preferences, learning, watch history and local watchlist.'),
             onTap: () async {
               final confirmed = await showDialog<bool>(

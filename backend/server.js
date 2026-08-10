@@ -731,26 +731,63 @@ function conservativeFuzzyTitleMatch(query, shows) {
   return best;
 }
 
-async function exactTitleCandidate(query) {
-  if (!looksLikeTitleLookup(query)) return null;
+function shouldTryDirectTitleLookup(query) {
+  const normalized = normalizeTitle(query);
+  if (!normalized) return false;
 
-  let searchResults;
+  // Preserve the recommendation engine's own title-intent detection.
+  if (looksLikeTitleLookup(query)) return true;
+
+  // A short, title-like phrase should still get a direct catalogue lookup.
+  // This is what makes typos such as "Severence" -> "Severance" work.
+  const words = normalized.split(' ').filter(Boolean);
+  if (words.length > 5 || normalized.length > 70) return false;
+
+  const descriptiveWords = new Set([
+    'something', 'show', 'series', 'watch', 'watching', 'want', 'looking',
+    'recommend', 'recommendation', 'genre', 'mood', 'funny', 'dark', 'lighter',
+    'gripping', 'comforting', 'clever', 'romantic', 'scary', 'short', 'shorter',
+    'season', 'seasons', 'episode', 'episodes', 'under', 'maximum', 'max',
+    'completed', 'complete', 'finished', 'exclude', 'without', 'like',
+  ]);
+
+  const descriptiveCount = words.filter((word) => descriptiveWords.has(word)).length;
+  return descriptiveCount === 0;
+}
+
+async function exactTitleCandidate(query) {
+  if (!shouldTryDirectTitleLookup(query)) return null;
+
+  let searchResults = [];
   try {
     searchResults = await tvMazeSearch(query);
   } catch {
-    return null;
+    // We can still try the cached catalogue below.
   }
 
-  const shows = searchResults.map((item) => item?.show).filter(Boolean);
   const wanted = normalizeTitle(query);
+  const searchShows = searchResults.map((item) => item?.show).filter(Boolean);
 
-  let match = shows.find((show) => normalizeTitle(show.name) === wanted);
+  let match = searchShows.find((show) => normalizeTitle(show.name) === wanted);
   let reason = 'Exact title match';
 
   if (!match) {
-    const fuzzy = conservativeFuzzyTitleMatch(query, shows);
+    const fuzzy = conservativeFuzzyTitleMatch(query, searchShows);
     match = fuzzy?.show || null;
     if (match) reason = `Title match: ${match.name}`;
+  }
+
+  // TVMaze search can occasionally rank a typo poorly. For short title-like
+  // requests, compare against our cached catalogue as a second pass.
+  if (!match) {
+    try {
+      const catalogue = await catalogueShows();
+      const fuzzy = conservativeFuzzyTitleMatch(query, catalogue);
+      match = fuzzy?.show || null;
+      if (match) reason = `Title match: ${match.name}`;
+    } catch {
+      // Normal prompt recommendations remain available.
+    }
   }
 
   if (!match) return null;
@@ -759,7 +796,7 @@ async function exactTitleCandidate(query) {
   try {
     show = await tvMazeShow(match.id);
   } catch {
-    // Search payload remains usable.
+    // Search/catalogue payload remains usable.
   }
 
   return {
