@@ -892,8 +892,11 @@ class _DiscoverPageState extends State<DiscoverPage> {
                 ],
                 if (_results.isNotEmpty) ...[
                   const SizedBox(height: 40),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  Wrap(
+                    spacing: 12,
+                    runSpacing: 6,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    alignment: WrapAlignment.spaceBetween,
                     children: [
                       Text(
                         _activeMood == null
