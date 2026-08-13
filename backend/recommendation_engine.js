@@ -10,6 +10,7 @@ export function normalizeTitle(value) {
     .toLowerCase()
     .normalize('NFKD')
     .replace(/[\u0300-\u036f]/g, '')
+    .replace(/(\d+)\s*ft\b/g, '$1 foot')
     .replace(/&/g, ' and ')
     .replace(/[^a-z0-9]+/g, ' ')
     .replace(/\s+/g, ' ')
@@ -69,6 +70,47 @@ const GENRE_ALIASES = {
   'science fiction': ['Science-Fiction'],
   documentary: ['Documentary'],
 };
+
+
+const TOPIC_FAMILIES = {
+  surfing: ['surf', 'surfer', 'surfers', 'surfing', 'wave', 'waves', 'big wave', 'ocean sport'],
+  nature: ['nature', 'natural world', 'wildlife', 'animal', 'animals', 'ecosystem', 'habitat', 'wilderness'],
+  wildlife: ['wildlife', 'animal', 'animals', 'species', 'habitat', 'conservation'],
+  ocean: ['ocean', 'oceans', 'sea', 'seas', 'marine', 'underwater', 'coast', 'coastal'],
+  science: ['science', 'scientist', 'scientists', 'scientific', 'physics', 'biology', 'astronomy', 'scientific research', 'scientist', 'scientists'],
+  space: ['space', 'astronomy', 'cosmos', 'planet', 'planets', 'nasa', 'astronaut', 'astronauts', 'universe'],
+  technology: ['technology', 'tech', 'computer', 'computers', 'internet', 'digital', 'robot', 'robots', 'artificial intelligence', 'ai'],
+  history: ['history', 'historical', 'historic', 'ancient', 'century', 'civilization', 'civilisation'],
+  war: ['war', 'warfare', 'battle', 'battles', 'military', 'soldier', 'soldiers', 'conflict'],
+  archaeology: ['archaeology', 'archaeological', 'archaeologist', 'ancient', 'excavation', 'ruins', 'artifact', 'artefact'],
+  'true crime': ['true crime', 'crime documentary', 'murder case', 'criminal case', 'investigation'],
+  food: ['food', 'cooking', 'cook', 'chef', 'chefs', 'cuisine', 'restaurant', 'restaurants', 'culinary'],
+  travel: ['travel', 'travelling', 'traveling', 'journey', 'journeys', 'destination', 'destinations', 'tourism'],
+  music: ['music', 'musician', 'musicians', 'singer', 'singers', 'band', 'bands', 'concert'],
+  sport: ['sport', 'sports', 'athlete', 'athletes', 'football', 'soccer', 'basketball', 'tennis', 'rugby', 'cycling'],
+  politics: ['politics', 'political', 'government', 'election', 'elections', 'president', 'parliament'],
+  biography: ['biography', 'biographical', 'life story', 'portrait of', 'memoir'],
+  medicine: ['medicine', 'medical', 'healthcare', 'doctor', 'doctors', 'disease', 'hospital'],
+  environment: ['environment', 'environmental', 'climate', 'climate change', 'conservation', 'ecology', 'planet'],
+  art: ['art', 'artist', 'artists', 'painting', 'paintings', 'gallery', 'museum', 'design'],
+  culture: ['culture', 'cultural', 'society', 'tradition', 'traditions', 'anthropology'],
+};
+
+const TOPIC_QUERY_PATTERNS = Object.fromEntries(Object.entries(TOPIC_FAMILIES).map(([topic, terms]) => [
+  topic,
+  new RegExp(`\\b(?:${[topic, ...terms].map((term) => term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\\ /g, '\\s+')).join('|')})\\b`, 'i'),
+]));
+
+function requestedTopics(raw) {
+  return Object.entries(TOPIC_QUERY_PATTERNS)
+    .filter(([, pattern]) => pattern.test(raw))
+    .map(([topic]) => topic);
+}
+
+function topicMatches(profile, topic) {
+  const terms = TOPIC_FAMILIES[topic] || [topic];
+  return [topic, ...terms].some((term) => profile.text.includes(term));
+}
 
 const MOOD_PROFILES = {
   gripping: {
@@ -164,6 +206,7 @@ export function parsePrompt(query) {
     exclusions,
     referenceTitle: referenceMatch?.[1]?.trim() || null,
     referenceGenres: [],
+    topics: requestedTopics(raw),
     topicTerms: (lower.match(/[a-z0-9-]{4,}/g) || []).filter((token) => !new Set([
       'documentary','series','show','shows','movie','movies','film','films','watch','something',
       'completed','finished','under','seasons','season','with','about','that','this','from','like',
@@ -190,6 +233,7 @@ export function parsePrompt(query) {
   if (intent.maxRuntime) labels.push(`Episodes up to ${intent.maxRuntime} min`);
   if (intent.completedOnly) labels.push('Completed series');
   if (intent.referenceTitle) labels.push(`Similar to ${intent.referenceTitle}`);
+  if (intent.topics.length) labels.push(`Topic: ${intent.topics.join(' / ')}`);
   if (intent.themes.length) labels.push(`Themes: ${intent.themes.join(', ')}`);
   if (intent.exclusions.length) labels.push(`Avoid: ${intent.exclusions.join(', ')}`);
   if (!labels.length) labels.push('Natural-language request applied');
@@ -265,10 +309,17 @@ export function auditPrompt(show, intent) {
   if (intent.exclusions.includes('violence') && /violence|violent|war|murder|killer|combat|torture|gore/.test(profile.text)) violations.push('Violence');
   if (intent.exclusions.includes('slow') && profile.attributes.pace <= 2) violations.push('Too slow');
   if (intent.themes.includes('feelGood') && (profile.attributes.comfort < 2 || profile.attributes.darkness >= 4)) violations.push('Not feel-good');
+  const topics = Array.isArray(intent.topics) ? intent.topics : [];
+  const matchedTopics = topics.filter((topic) => topicMatches(profile, topic));
+  if (topics.length && matchedTopics.length !== topics.length) violations.push('Missing requested topic');
+
+  // For unknown descriptive terms, keep the old lexical guard when a format/genre
+  // was explicitly requested. Known topic families above are stronger and work
+  // even for a bare query such as "history" or "nature".
   const topicTerms = Array.isArray(intent.topicTerms) ? intent.topicTerms : [];
-  if (topicTerms.length && intent.requiredGenres.length) {
-    const topicMatches = topicTerms.filter((term) => profile.text.includes(term));
-    if (!topicMatches.length) violations.push('Missing requested topic');
+  if (!topics.length && topicTerms.length && intent.requiredGenres.length) {
+    const lexicalMatches = topicTerms.filter((term) => profile.text.includes(term));
+    if (!lexicalMatches.length) violations.push('Missing requested topic');
   }
 
   return { passed: violations.length === 0, violations, requiredMatches, profile };
@@ -294,6 +345,7 @@ export function scorePrompt(show, query, intent) {
   if (!audit.passed) return { passed: false, score: -999, reasons: [], audit };
   const p = audit.profile;
   let score = audit.requiredMatches.length * 30;
+  score += (intent.topics || []).length * 35;
   score += themeScore(p, intent.themes);
   score += Math.min(p.rating, 10) * 1.2;
   score += p.popularity / 40;
@@ -326,6 +378,7 @@ export function scorePrompt(show, query, intent) {
 
   const reasons = [];
   if (audit.requiredMatches.length) reasons.push(`Required match: ${audit.requiredMatches.join(' / ')}`);
+  if (intent.topics?.length) reasons.push(`Topic: ${intent.topics.join(' / ')}`);
   if (intent.completedOnly) reasons.push('Completed series');
   if (intent.maxSeasons) reasons.push(`${p.seasons} seasons — within your limit`);
   if (intent.maxRuntime) reasons.push(`${p.runtime}-minute episodes — within your limit`);

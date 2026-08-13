@@ -827,6 +827,15 @@ async function exactTitleCandidate(query) {
   let searchResults = [];
   try {
     searchResults = await tvMazeSearch(query);
+    const expandedQuery = normalizeTitle(query);
+    if (expandedQuery && expandedQuery !== String(query).toLowerCase().trim()) {
+      const expandedResults = await tvMazeSearch(expandedQuery);
+      const merged = new Map();
+      for (const item of [...searchResults, ...expandedResults]) {
+        if (item?.show?.id) merged.set(item.show.id, item);
+      }
+      searchResults = [...merged.values()];
+    }
   } catch {
     // We can still try the cached catalogue below.
   }

@@ -138,3 +138,34 @@ test('surfing documentary requires both documentary format and surfing topic', (
   const surfing = show({ name: 'Surf Stories', genres: ['Documentary'], summary: 'A documentary following surfers and surfing culture around the world.' });
   assert.equal(scorePrompt(surfing, 'surfing documentary', intent).passed, true);
 });
+
+
+test('bare topic queries reject unrelated popular shows', () => {
+  for (const [query, goodSummary] of [
+    ['nature', 'Wildlife in remote wilderness habitats and the natural world.'],
+    ['science', 'Scientists explore physics, biology and scientific research.'],
+    ['history', 'A documentary journey through ancient history and civilizations.'],
+    ['space', 'Astronauts explore planets, astronomy and the universe.'],
+    ['food', 'Chefs explore cooking, cuisine and restaurants around the world.'],
+    ['travel', 'A travel journey through destinations and cultures around the world.'],
+  ]) {
+    const intent = parsePrompt(query);
+    const unrelated = show({ name: 'Breaking Bad', genres: ['Drama', 'Crime'], summary: 'A chemistry teacher enters the drug trade.' });
+    const relevant = show({ name: `Relevant ${query}`, genres: ['Documentary'], summary: goodSummary });
+    assert.equal(scorePrompt(unrelated, query, intent).passed, false, `${query} should reject unrelated show`);
+    assert.equal(scorePrompt(relevant, query, intent).passed, true, `${query} should accept relevant show`);
+  }
+});
+
+test('combined topic and documentary intent requires both', () => {
+  const intent = parsePrompt('ocean science documentary');
+  const crimeDoc = show({ genres: ['Documentary'], summary: 'A true crime investigation.' });
+  const oceanScience = show({ genres: ['Documentary'], summary: 'Marine scientists research ocean ecosystems underwater.' });
+  assert.equal(scorePrompt(crimeDoc, intent.raw, intent).passed, false);
+  assert.equal(scorePrompt(oceanScience, intent.raw, intent).passed, true);
+});
+
+test('100ft wave normalizes to 100 Foot Wave for title recovery', () => {
+  assert.equal(normalizeTitle('100ft Wave'), normalizeTitle('100 Foot Wave'));
+  assert.equal(looksLikeTitleLookup('100ft Wave'), true);
+});

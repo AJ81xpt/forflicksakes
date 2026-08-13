@@ -296,6 +296,8 @@ class _AppShellState extends State<AppShell> {
         completedOnly: _completedOnly,
         watchedCount: _watched.length,
         dismissedCount: _dismissed.length,
+        dismissedIds: _dismissed,
+        knownShows: _knownShows,
         feedbackCounts: _feedbackCounts,
         onRegionChanged: (value) {
           setState(() => _region = value);
@@ -312,6 +314,10 @@ class _AppShellState extends State<AppShell> {
         onCompletedOnlyChanged: (value) {
           setState(() => _completedOnly = value);
           _persistPreferences();
+        },
+        onRestoreDismissed: (id) async {
+          await _personalization.restoreDismissed(id);
+          await _loadPersonalization();
         },
         onReset: _resetPersonalization,
       ),
@@ -406,6 +412,7 @@ class _DiscoverPageState extends State<DiscoverPage> {
   List<ShowItem> _results = const <ShowItem>[];
   List<String> _interpretation = const <String>[];
   String _lastQuery = '';
+  int _visibleResultCount = 5;
 
 
   static const moods = <_MoodOption>[
@@ -456,6 +463,7 @@ class _DiscoverPageState extends State<DiscoverPage> {
       _resultMode = 'prompt';
       _interpretation = const <String>[];
       _lastQuery = query;
+      _visibleResultCount = 5;
     });
 
     try {
@@ -481,7 +489,7 @@ class _DiscoverPageState extends State<DiscoverPage> {
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _error = error.toString().replaceFirst('Exception: ', '');
+        _error = 'Oops, looks like something went wrong. Please try again.';
       });
     }
   }
@@ -496,6 +504,7 @@ class _DiscoverPageState extends State<DiscoverPage> {
       _resultMode = 'mood';
       _interpretation = <String>['Mood: ${mood.title}'];
       _lastQuery = '';
+      _visibleResultCount = 5;
     });
 
     try {
@@ -521,7 +530,7 @@ class _DiscoverPageState extends State<DiscoverPage> {
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _error = error.toString().replaceFirst('Exception: ', '');
+        _error = 'Oops, looks like something went wrong. Please try again.';
       });
     }
   }
@@ -613,9 +622,10 @@ class _DiscoverPageState extends State<DiscoverPage> {
       context: context,
       showDragHandle: true,
       backgroundColor: const Color(0xFF15111D),
+      isScrollControlled: true,
       builder: (sheetContext) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 4, 20, 28),
+        child: SingleChildScrollView(
+          padding: EdgeInsets.fromLTRB(20, 4, 20, 28 + MediaQuery.viewInsetsOf(sheetContext).bottom),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -923,7 +933,7 @@ class _DiscoverPageState extends State<DiscoverPage> {
                     ),
                   ),
                   const SizedBox(height: 18),
-                  ..._results.map(
+                  ..._results.take(_visibleResultCount).map(
                     (show) => Padding(
                       padding: const EdgeInsets.only(bottom: 16),
                       child: ResultCard(
@@ -935,6 +945,15 @@ class _DiscoverPageState extends State<DiscoverPage> {
                       ),
                     ),
                   ),
+                  if (_results.length > _visibleResultCount) ...[
+                    const SizedBox(height: 4),
+                    FilledButton.icon(
+                      onPressed: () => setState(() => _visibleResultCount = (_visibleResultCount + 5).clamp(0, _results.length)),
+                      icon: const Icon(Icons.add_rounded),
+                      label: Text('Show ${(_results.length - _visibleResultCount).clamp(0, 5)} more options'),
+                    ),
+                    const SizedBox(height: 10),
+                  ],
                   const SizedBox(height: 6),
                   OutlinedButton.icon(
                     onPressed: _showResultsFeedback,
@@ -1774,10 +1793,6 @@ class _ShowDetailPageState extends State<ShowDetailPage> {
                       ),
                     )),
                   ],
-                if (_options?.attribution.isNotEmpty ?? false) ...[
-                  const SizedBox(height: 8),
-                  Text(_options!.attribution, style: const TextStyle(color: Color(0xFF77717F), fontSize: 12)),
-                ],
               ],
             ),
           ),
@@ -1985,7 +2000,7 @@ class _ForYouPageState extends State<ForYouPage> {
         _ForYouSection(
           title: 'Because you ${widget.saved.contains(anchor.id) ? 'saved' : 'watched'} ${anchor.title}',
           subtitle: 'Using a show you chose as the reference point.',
-          shows: results[0].shows.where((show) => show.id != anchor.id).take(6).toList(),
+          shows: results[0].shows.where((show) => show.id != anchor.id && !excluded.contains(show.id)).take(6).toList(),
         ),
       ];
       var resultIndex = 1;
@@ -1993,13 +2008,13 @@ class _ForYouPageState extends State<ForYouPage> {
         sections.add(_ForYouSection(
           title: 'Your kind of ${genreNames.first.toLowerCase()}',
           subtitle: 'Based on genres that appear in your saved and watched titles.',
-          shows: results[resultIndex++].shows.take(6).toList(),
+          shows: results[resultIndex++].shows.where((show) => !excluded.contains(show.id)).take(6).toList(),
         ));
       }
       sections.add(_ForYouSection(
         title: 'Easy watches tonight',
         subtitle: 'Shorter episodes, filtered through your normal profile settings.',
-        shows: results[resultIndex].shows.take(6).toList(),
+        shows: results[resultIndex].shows.where((show) => !excluded.contains(show.id)).take(6).toList(),
       ));
 
       final allShows = sections.expand((section) => section.shows);
@@ -2016,7 +2031,7 @@ class _ForYouPageState extends State<ForYouPage> {
       setState(() {
         _signature = signature;
         _loading = false;
-        _error = error.toString().replaceFirst('Exception: ', '');
+        _error = 'Oops, looks like something went wrong. Please try again.';
       });
     }
   }
@@ -2267,11 +2282,14 @@ class ProfilePage extends StatelessWidget {
     required this.completedOnly,
     required this.watchedCount,
     required this.dismissedCount,
+    required this.dismissedIds,
+    required this.knownShows,
     required this.feedbackCounts,
     required this.onRegionChanged,
     required this.onServicesChanged,
     required this.onMaxSeasonsChanged,
     required this.onCompletedOnlyChanged,
+    required this.onRestoreDismissed,
     required this.onReset,
     super.key,
   });
@@ -2284,11 +2302,14 @@ class ProfilePage extends StatelessWidget {
   final bool completedOnly;
   final int watchedCount;
   final int dismissedCount;
+  final Set<int> dismissedIds;
+  final Map<int, ShowItem> knownShows;
   final Map<String, int> feedbackCounts;
   final ValueChanged<String> onRegionChanged;
   final ValueChanged<Set<String>> onServicesChanged;
   final ValueChanged<int> onMaxSeasonsChanged;
   final ValueChanged<bool> onCompletedOnlyChanged;
+  final Future<void> Function(int id) onRestoreDismissed;
   final Future<void> Function() onReset;
 
   static const serviceOptions = <String>[
@@ -2380,14 +2401,62 @@ class ProfilePage extends StatelessWidget {
             }).toList(),
           ),
           const SizedBox(height: 30),
-          Text('Maximum seasons: $maxSeasons', style: Theme.of(context).textTheme.titleLarge),
-          Slider(value: maxSeasons.toDouble(), min: 1, max: 10, divisions: 9, onChanged: (value) => onMaxSeasonsChanged(value.round())),
           SwitchListTile(
             contentPadding: EdgeInsets.zero,
             value: completedOnly,
             title: const Text('Completed shows only'),
             subtitle: const Text('Apply this preference automatically to prompt and mood recommendations.'),
             onChanged: onCompletedOnlyChanged,
+          ),
+          const Divider(height: 42),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.hide_source_rounded),
+            title: const Text('Not interested'),
+            subtitle: Text(dismissedIds.isEmpty
+                ? 'No dismissed titles.'
+                : '${dismissedIds.length} dismissed title${dismissedIds.length == 1 ? '' : 's'}. Tap to review or restore.'),
+            trailing: const Icon(Icons.chevron_right_rounded),
+            onTap: dismissedIds.isEmpty ? null : () {
+              showModalBottomSheet<void>(
+                context: context,
+                isScrollControlled: true,
+                showDragHandle: true,
+                backgroundColor: const Color(0xFF15111D),
+                builder: (sheetContext) => SafeArea(
+                  child: SizedBox(
+                    height: MediaQuery.sizeOf(sheetContext).height * 0.7,
+                    child: ListView(
+                      padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
+                      children: [
+                        Text('Not interested', style: Theme.of(sheetContext).textTheme.headlineSmall),
+                        const SizedBox(height: 6),
+                        const Text('These titles are excluded from future recommendations. Restore one if you dismissed it by mistake.'),
+                        const SizedBox(height: 12),
+                        for (final id in dismissedIds)
+                          ListTile(
+                            contentPadding: EdgeInsets.zero,
+                            title: Text(knownShows[id]?.title ?? 'Title #$id'),
+                            trailing: TextButton(
+                              onPressed: () async {
+                                await onRestoreDismissed(id);
+                                if (sheetContext.mounted) Navigator.pop(sheetContext);
+                              },
+                              child: const Text('Restore'),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+          const ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: Icon(Icons.info_outline_rounded),
+            title: Text('Data sources & terms'),
+            subtitle: Text('Catalogue data is provided by TVMaze. Streaming availability uses Streaming Availability API (Movie of the Night). Availability can vary by region and provider.'),
           ),
           const Divider(height: 42),
           ListTile(
@@ -2414,7 +2483,7 @@ class ProfilePage extends StatelessWidget {
             contentPadding: EdgeInsets.zero,
             leading: Icon(Icons.lock_outline_rounded),
             title: Text('Stored locally'),
-            subtitle: Text('Sprint 4 keeps taste data on this device. Cloud sync comes with accounts.'),
+            subtitle: Text('Your preferences are saved securely on this device.'),
           ),
         ],
       ),
@@ -2444,3 +2513,4 @@ class _TasteStat extends StatelessWidget {
     ]),
   );
 }
+
