@@ -31,7 +31,7 @@ class PersonalizationSnapshot {
   factory PersonalizationSnapshot.defaults() => const PersonalizationSnapshot(
         region: 'ZA',
         services: {'Netflix', 'Prime Video', 'HBO Max', 'Showmax'},
-        maxSeasons: 3,
+        maxSeasons: 99,
         completedOnly: false,
         savedIds: <int>{},
         dismissedIds: <int>{},
@@ -131,6 +131,14 @@ class PersonalizationStore {
       prefs.setStringList(_watchedIdsKey, watched.map((id) => '$id').toList()),
       prefs.setString(_feedbackKey, jsonEncode(counts)),
     ]);
+  }
+
+
+  Future<void> restoreDismissed(int showId) async {
+    final prefs = await SharedPreferences.getInstance();
+    final snapshot = await load();
+    final dismissed = {...snapshot.dismissedIds}..remove(showId);
+    await prefs.setStringList(_dismissedIdsKey, dismissed.map((id) => '$id').toList());
   }
 
   Future<void> saveAppLanguage(String languageCode) async {

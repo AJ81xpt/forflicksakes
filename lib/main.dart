@@ -180,7 +180,7 @@ class _AppShellState extends State<AppShell> {
   bool _loadingProfile = true;
   String _region = 'ZA';
   Set<String> _services = <String>{'Netflix', 'Prime Video', 'HBO Max', 'Showmax'};
-  int _maxSeasons = 3;
+  int _maxSeasons = 99;
   bool _completedOnly = false;
   String _appLanguage = 'en';
   Set<int> _saved = <int>{};
@@ -201,7 +201,7 @@ class _AppShellState extends State<AppShell> {
     setState(() {
       _region = snapshot.region;
       _services = snapshot.services;
-      _maxSeasons = snapshot.maxSeasons;
+      _maxSeasons = 99; // No global season cap; prompt-specific limits still work.
       _completedOnly = snapshot.completedOnly;
       _saved = snapshot.savedIds;
       _dismissed = snapshot.dismissedIds;
@@ -714,7 +714,7 @@ class _DiscoverPageState extends State<DiscoverPage> {
                       padding: EdgeInsets.only(left: 15, right: 8, bottom: 48),
                       child: Icon(Icons.chat_bubble_outline_rounded, size: 27),
                     ),
-                    hintText: 'A completed psychological thriller under 3 seasons with clever twists',
+                    hintText: 'A psychological thriller that has finished airing, under 3 seasons, with clever twists',
                     filled: true,
                     fillColor: const Color(0xFF15111D),
                     contentPadding: const EdgeInsets.symmetric(
@@ -742,7 +742,7 @@ class _DiscoverPageState extends State<DiscoverPage> {
                 const Padding(
                   padding: EdgeInsets.symmetric(horizontal: 4),
                   child: Text(
-                    'Try a genre, maximum seasons, episode length, completed status, exclusions, or “something like…”',
+                    'Try a genre, topic, episode length, finished-series preference, exclusions, or “something like…”',
                     style: TextStyle(
                       color: Color(0xFF827C8C),
                       fontSize: 13,
@@ -2404,8 +2404,8 @@ class ProfilePage extends StatelessWidget {
           SwitchListTile(
             contentPadding: EdgeInsets.zero,
             value: completedOnly,
-            title: const Text('Completed shows only'),
-            subtitle: const Text('Apply this preference automatically to prompt and mood recommendations.'),
+            title: const Text('Finished series only'),
+            subtitle: const Text('Only recommend series that have finished airing.'),
             onChanged: onCompletedOnlyChanged,
           ),
           const Divider(height: 42),

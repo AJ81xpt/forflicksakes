@@ -3,30 +3,143 @@ const stripHtml = (value = '') => String(value)
   .replace(/\s+/g, ' ')
   .trim();
 
-
-
 export function normalizeTitle(value) {
   return String(value || '')
     .toLowerCase()
     .normalize('NFKD')
     .replace(/[\u0300-\u036f]/g, '')
-    .replace(/(\d+)\s*ft\b/g, '$1 foot')
+    .replace(/\b(\d+)\s*ft\b/g, '$1 foot')
+    .replace(/\b(\d+)ft\b/g, '$1 foot')
     .replace(/&/g, ' and ')
     .replace(/[^a-z0-9]+/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
 }
 
+const TOPIC_FAMILIES = {
+  surfing: {
+    aliases: ['surfing', 'surf', 'surfer', 'surfers', 'big wave', 'big-wave'],
+    evidence: /\b(?:surf(?:ing|er|ers)?|big[- ]wave|wave riding)\b/i,
+    searchTerms: ['surfing', 'surfer', 'big wave'],
+  },
+  ocean: {
+    aliases: ['ocean', 'oceans', 'sea', 'marine', 'underwater'],
+    evidence: /\b(?:ocean|oceans|marine|underwater|sea life|seabed|deep sea)\b/i,
+    searchTerms: ['ocean', 'marine', 'underwater'],
+  },
+  nature: {
+    aliases: ['nature', 'natural world'],
+    evidence: /\b(?:nature|natural world|wilderness|ecosystem|habitat)\b/i,
+    searchTerms: ['nature', 'wilderness'],
+  },
+  wildlife: {
+    aliases: ['wildlife', 'animals', 'animal'],
+    evidence: /\b(?:wildlife|wild animals?|animals?|species|habitat|safari)\b/i,
+    searchTerms: ['wildlife', 'animals'],
+  },
+  science: {
+    aliases: ['science', 'scientific'],
+    evidence: /\b(?:science|scientific|scientist|scientists|physics|biology|genetics|neuroscience|astronomy|research laboratory|research lab)\b/i,
+    searchTerms: ['science', 'scientist', 'physics', 'biology'],
+  },
+  space: {
+    aliases: ['space', 'astronomy', 'cosmos', 'universe'],
+    evidence: /\b(?:space|astronomy|cosmos|universe|planet|planets|galaxy|galaxies|nasa|astronaut|astronauts|moon|mars)\b/i,
+    searchTerms: ['space', 'astronomy', 'universe'],
+  },
+  technology: {
+    aliases: ['technology', 'tech', 'computers', 'computer', 'internet', 'ai', 'artificial intelligence'],
+    evidence: /\b(?:technology|tech|computer|computers|internet|artificial intelligence|\bai\b|robot|robots|software|cyber)\b/i,
+    searchTerms: ['technology', 'computer', 'artificial intelligence'],
+  },
+  history: {
+    aliases: ['history', 'historical'],
+    evidence: /\b(?:history|historical|historic|ancient|century|civilization|civilisation|empire|dynasty|medieval|victorian|archive|archival)\b/i,
+    searchTerms: ['history', 'historical', 'ancient'],
+  },
+  war: {
+    aliases: ['war', 'warfare', 'military'],
+    evidence: /\b(?:war|warfare|military|battle|army|soldier|soldiers|world war|conflict)\b/i,
+    searchTerms: ['war', 'military'],
+  },
+  archaeology: {
+    aliases: ['archaeology', 'archeology', 'archaeological', 'archeological'],
+    evidence: /\b(?:archaeolog|archeolog|excavation|ancient ruins|artifact|artefact)\w*/i,
+    searchTerms: ['archaeology', 'ancient ruins'],
+  },
+  'true crime': {
+    aliases: ['true crime', 'real crime'],
+    evidence: /\b(?:true crime|real[- ]life crime|murder case|criminal case|serial killer|unsolved crime)\b/i,
+    searchTerms: ['true crime', 'unsolved crime'],
+  },
+  food: {
+    aliases: ['food', 'cooking', 'chef', 'chefs', 'culinary', 'cuisine'],
+    evidence: /\b(?:food|cooking|chef|chefs|culinary|cuisine|restaurant|restaurants|baking|gastronomy)\b/i,
+    searchTerms: ['food', 'cooking', 'chef'],
+  },
+  travel: {
+    aliases: ['travel', 'travelling', 'traveling', 'journey', 'journeys'],
+    evidence: /\b(?:travel|travelling|traveling|journey|journeys|tourism|destination|destinations|road trip|around the world)\b/i,
+    searchTerms: ['travel', 'journey'],
+  },
+  music: {
+    aliases: ['music', 'musician', 'musicians', 'band', 'bands'],
+    evidence: /\b(?:music|musician|musicians|band|bands|singer|singers|songwriter|concert|album|rock star|hip hop|jazz)\b/i,
+    searchTerms: ['music', 'musician'],
+  },
+  sport: {
+    aliases: ['sport', 'sports', 'football', 'soccer', 'rugby', 'cricket', 'basketball', 'tennis', 'cycling', 'athletics'],
+    evidence: /\b(?:sport|sports|football|soccer|rugby|cricket|basketball|tennis|cycling|athlete|athletes|athletics|championship|tournament|team)\b/i,
+    searchTerms: ['sports', 'athlete'],
+  },
+  politics: {
+    aliases: ['politics', 'political', 'government', 'election', 'elections'],
+    evidence: /\b(?:politics|political|government|election|elections|president|prime minister|parliament|congress|campaign)\b/i,
+    searchTerms: ['politics', 'government'],
+  },
+  biography: {
+    aliases: ['biography', 'biographical', 'biopic', 'life story'],
+    evidence: /\b(?:biography|biographical|biopic|life story|portrait of|career of)\b/i,
+    searchTerms: ['biography', 'life story'],
+  },
+  medicine: {
+    aliases: ['medicine', 'medical', 'health', 'doctor', 'doctors'],
+    evidence: /\b(?:medicine|medical|health|doctor|doctors|hospital|disease|patient|patients|surgery|public health)\b/i,
+    searchTerms: ['medicine', 'medical', 'health'],
+  },
+  environment: {
+    aliases: ['environment', 'environmental', 'climate', 'climate change', 'conservation'],
+    evidence: /\b(?:environment|environmental|climate|climate change|conservation|global warming|pollution|sustainability)\b/i,
+    searchTerms: ['environment', 'climate', 'conservation'],
+  },
+  art: {
+    aliases: ['art', 'artist', 'artists', 'painting', 'photography', 'design'],
+    evidence: /\b(?:art|artist|artists|painting|painter|photography|photographer|design|museum|gallery|sculpture)\b/i,
+    searchTerms: ['art', 'artist'],
+  },
+  culture: {
+    aliases: ['culture', 'cultural', 'society', 'tradition', 'traditions'],
+    evidence: /\b(?:culture|cultural|society|tradition|traditions|community|communities|heritage|identity)\b/i,
+    searchTerms: ['culture', 'cultural'],
+  },
+};
+
+const GENERIC_TOPIC_PHRASES = new Set(
+  Object.values(TOPIC_FAMILIES).flatMap((family) => family.aliases.map(normalizeTitle)),
+);
+
 export function looksLikeTitleLookup(query) {
   const raw = String(query || '').trim();
   if (!raw) return false;
+  const normalized = normalizeTitle(raw);
   const lower = raw.toLowerCase();
-  const words = normalizeTitle(raw).split(' ').filter(Boolean);
+  const words = normalized.split(' ').filter(Boolean);
   if (!words.length || words.length > 8) return false;
 
-  // These constructions clearly describe intent rather than naming a title.
+  if (GENERIC_TOPIC_PHRASES.has(normalized)) return false;
+
   const intentPatterns = [
-    /\b(?:something|anything|show|series|programme|program|watch|documentary|docuseries|movie|film)\b/i,
+    /\b(?:something|anything|show|series|programme|program|watch|documentary|documentaries|docuseries|movie|film)\b/i,
     /\b(?:i\s+(?:want|need|feel like|am looking for)|looking for|find me|recommend)\b/i,
     /\b(?:like|similar to)\b/i,
     /\b(?:under|over|less than|more than|no more than|up to|max(?:imum)?)\b/i,
@@ -36,118 +149,26 @@ export function looksLikeTitleLookup(query) {
     /\b(?:happy|happier|cheerful|joyful|feel[- ]good|uplifting|comforting|funny|gripping|clever)\b/i,
   ];
 
-  // Bare "Dark" is intentionally allowed as a title lookup. "Something dark"
-  // is caught by the descriptive construction above.
   if (lower === 'dark') return true;
   return !intentPatterns.some((pattern) => pattern.test(raw));
 }
 
 const GENRE_ALIASES = {
-  thriller: ['Thriller'],
-  suspense: ['Thriller'],
-  mystery: ['Mystery'],
-  detective: ['Mystery', 'Crime'],
-  crime: ['Crime'],
-  comedy: ['Comedy'],
-  funny: ['Comedy'],
-  funnier: ['Comedy'],
-  sitcom: ['Comedy'],
-  romance: ['Romance'],
-  romantic: ['Romance'],
-  horror: ['Horror'],
-  scary: ['Horror'],
-  fantasy: ['Fantasy'],
-  action: ['Action'],
-  adventure: ['Adventure'],
-  drama: ['Drama'],
-  emotional: ['Drama'],
-  animation: ['Animation'],
-  animated: ['Animation'],
-  anime: ['Animation'],
-  family: ['Family'],
-  'sci-fi': ['Science-Fiction'],
-  scifi: ['Science-Fiction'],
-  'science fiction': ['Science-Fiction'],
-  documentary: ['Documentary'],
+  thriller: ['Thriller'], suspense: ['Thriller'], mystery: ['Mystery'], detective: ['Mystery', 'Crime'],
+  crime: ['Crime'], comedy: ['Comedy'], funny: ['Comedy'], funnier: ['Comedy'], sitcom: ['Comedy'],
+  romance: ['Romance'], romantic: ['Romance'], horror: ['Horror'], scary: ['Horror'], fantasy: ['Fantasy'],
+  action: ['Action'], adventure: ['Adventure'], drama: ['Drama'], emotional: ['Drama'], animation: ['Animation'],
+  animated: ['Animation'], anime: ['Animation'], family: ['Family'], 'sci-fi': ['Science-Fiction'],
+  scifi: ['Science-Fiction'], 'science fiction': ['Science-Fiction'], documentary: ['Documentary'], documentaries: ['Documentary'],
+  docuseries: ['Documentary'],
 };
-
-
-const TOPIC_FAMILIES = {
-  surfing: ['surf', 'surfer', 'surfers', 'surfing', 'wave', 'waves', 'big wave', 'ocean sport'],
-  nature: ['nature', 'natural world', 'wildlife', 'animal', 'animals', 'ecosystem', 'habitat', 'wilderness'],
-  wildlife: ['wildlife', 'animal', 'animals', 'species', 'habitat', 'conservation'],
-  ocean: ['ocean', 'oceans', 'sea', 'seas', 'marine', 'underwater', 'coast', 'coastal'],
-  science: ['science', 'scientist', 'scientists', 'scientific', 'physics', 'biology', 'astronomy', 'scientific research', 'scientist', 'scientists'],
-  space: ['space', 'astronomy', 'cosmos', 'planet', 'planets', 'nasa', 'astronaut', 'astronauts', 'universe'],
-  technology: ['technology', 'tech', 'computer', 'computers', 'internet', 'digital', 'robot', 'robots', 'artificial intelligence', 'ai'],
-  history: ['history', 'historical', 'historic', 'ancient', 'century', 'civilization', 'civilisation'],
-  war: ['war', 'warfare', 'battle', 'battles', 'military', 'soldier', 'soldiers', 'conflict'],
-  archaeology: ['archaeology', 'archaeological', 'archaeologist', 'ancient', 'excavation', 'ruins', 'artifact', 'artefact'],
-  'true crime': ['true crime', 'crime documentary', 'murder case', 'criminal case', 'investigation'],
-  food: ['food', 'cooking', 'cook', 'chef', 'chefs', 'cuisine', 'restaurant', 'restaurants', 'culinary'],
-  travel: ['travel', 'travelling', 'traveling', 'journey', 'journeys', 'destination', 'destinations', 'tourism'],
-  music: ['music', 'musician', 'musicians', 'singer', 'singers', 'band', 'bands', 'concert'],
-  sport: ['sport', 'sports', 'athlete', 'athletes', 'football', 'soccer', 'basketball', 'tennis', 'rugby', 'cycling'],
-  politics: ['politics', 'political', 'government', 'election', 'elections', 'president', 'parliament'],
-  biography: ['biography', 'biographical', 'life story', 'portrait of', 'memoir'],
-  medicine: ['medicine', 'medical', 'healthcare', 'doctor', 'doctors', 'disease', 'hospital'],
-  environment: ['environment', 'environmental', 'climate', 'climate change', 'conservation', 'ecology', 'planet'],
-  art: ['art', 'artist', 'artists', 'painting', 'paintings', 'gallery', 'museum', 'design'],
-  culture: ['culture', 'cultural', 'society', 'tradition', 'traditions', 'anthropology'],
-};
-
-const TOPIC_QUERY_PATTERNS = Object.fromEntries(Object.entries(TOPIC_FAMILIES).map(([topic, terms]) => [
-  topic,
-  new RegExp(`\\b(?:${[topic, ...terms].map((term) => term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\\ /g, '\\s+')).join('|')})\\b`, 'i'),
-]));
-
-function requestedTopics(raw) {
-  return Object.entries(TOPIC_QUERY_PATTERNS)
-    .filter(([, pattern]) => pattern.test(raw))
-    .map(([topic]) => topic);
-}
-
-function topicMatches(profile, topic) {
-  const terms = TOPIC_FAMILIES[topic] || [topic];
-  return [topic, ...terms].some((term) => profile.text.includes(term));
-}
 
 const MOOD_PROFILES = {
-  gripping: {
-    label: 'Gripping',
-    minScore: 8,
-    genres: { Thriller: 8, Crime: 6, Mystery: 7, Action: 4, Adventure: 2 },
-    themes: { suspense: 6, conspiracy: 5, investigation: 4, murder: 4, danger: 3, missing: 3, espionage: 5, hostage: 4, hunt: 3, secret: 2 },
-    penalties: { preschool: 12, reality: 8, 'talk show': 8 },
-  },
-  dark: {
-    label: 'Dark',
-    minScore: 9,
-    genres: { Horror: 8, Thriller: 6, Crime: 5, Mystery: 4, Drama: 2 },
-    themes: { psychological: 6, bleak: 6, disturbing: 6, dystopian: 5, corruption: 4, revenge: 4, noir: 5, grim: 5, haunted: 5, murder: 3 },
-    penalties: { 'feel-good': 9, preschool: 12, uplifting: 6, wholesome: 6 },
-  },
-  funny: {
-    label: 'Funny',
-    minScore: 8,
-    genres: { Comedy: 10 },
-    themes: { witty: 5, funny: 5, satire: 5, sitcom: 6, awkward: 3, workplace: 3, comic: 4, humour: 4, humor: 4 },
-    penalties: { torture: 8, bleak: 6, 'serial killer': 8 },
-  },
-  comforting: {
-    label: 'Comforting',
-    minScore: 8,
-    genres: { Comedy: 5, Romance: 4, Family: 5 },
-    themes: { heartwarming: 7, friendship: 5, community: 5, 'small town': 4, cooking: 4, warm: 5, cozy: 6, cosy: 6, uplifting: 6, kindness: 5, home: 3, wholesome: 6 },
-    penalties: { horror: 12, torture: 12, apocalypse: 10, disturbing: 10, bleak: 9, 'serial killer': 12 },
-  },
-  clever: {
-    label: 'Clever',
-    minScore: 8,
-    genres: { Mystery: 7, 'Science-Fiction': 6, Crime: 4, Thriller: 4, Drama: 2 },
-    themes: { puzzle: 7, twist: 6, investigation: 4, strategy: 6, genius: 5, experiment: 4, technology: 4, conspiracy: 3, 'time travel': 5, mind: 3 },
-    penalties: { preschool: 10, reality: 7, 'talk show': 7 },
-  },
+  gripping: { label: 'Gripping', minScore: 8, genres: { Thriller: 8, Crime: 6, Mystery: 7, Action: 4, Adventure: 2 }, themes: { suspense: 6, conspiracy: 5, investigation: 4, murder: 4, danger: 3, missing: 3, espionage: 5, hostage: 4, hunt: 3, secret: 2 }, penalties: { preschool: 12, reality: 8, 'talk show': 8 } },
+  dark: { label: 'Dark', minScore: 9, genres: { Horror: 8, Thriller: 6, Crime: 5, Mystery: 4, Drama: 2 }, themes: { psychological: 6, bleak: 6, disturbing: 6, dystopian: 5, corruption: 4, revenge: 4, noir: 5, grim: 5, haunted: 5, murder: 3 }, penalties: { 'feel-good': 9, preschool: 12, uplifting: 6, wholesome: 6 } },
+  funny: { label: 'Funny', minScore: 8, genres: { Comedy: 10 }, themes: { witty: 5, funny: 5, satire: 5, sitcom: 6, awkward: 3, workplace: 3, comic: 4, humour: 4, humor: 4 }, penalties: { torture: 8, bleak: 6, 'serial killer': 8 } },
+  comforting: { label: 'Comforting', minScore: 8, genres: { Comedy: 5, Romance: 4, Family: 5 }, themes: { heartwarming: 7, friendship: 5, community: 5, 'small town': 4, cooking: 4, warm: 5, cozy: 6, cosy: 6, uplifting: 6, kindness: 5, home: 3, wholesome: 6 }, penalties: { horror: 12, torture: 12, apocalypse: 10, disturbing: 10, bleak: 9, 'serial killer': 12 } },
+  clever: { label: 'Clever', minScore: 8, genres: { Mystery: 7, 'Science-Fiction': 6, Crime: 4, Thriller: 4, Drama: 2 }, themes: { puzzle: 7, twist: 6, investigation: 4, strategy: 6, genius: 5, experiment: 4, technology: 4, conspiracy: 3, 'time travel': 5, mind: 3 }, penalties: { preschool: 10, reality: 7, 'talk show': 7 } },
 };
 
 const NEGATION_PATTERNS = [
@@ -169,6 +190,18 @@ const THEME_RULES = {
   dark: /(?<!not )(?:\bdark\b|\bbleak\b|\bgrim\b|\bdisturbing\b|\bunsettling\b)/i,
 };
 
+function detectedTopics(raw) {
+  const normalized = ` ${normalizeTitle(raw)} `;
+  const topics = [];
+  for (const [key, family] of Object.entries(TOPIC_FAMILIES)) {
+    if (family.aliases.some((alias) => normalized.includes(` ${normalizeTitle(alias)} `))) topics.push(key);
+  }
+  // Avoid requiring both broad + narrow families for obvious overlaps.
+  if (topics.includes('surfing')) return topics.filter((key) => key !== 'ocean');
+  if (topics.includes('wildlife')) return topics.filter((key) => key !== 'nature');
+  return topics;
+}
+
 export function parsePrompt(query) {
   const raw = String(query || '').trim();
   const lower = raw.toLowerCase();
@@ -178,66 +211,46 @@ export function parsePrompt(query) {
   const exclusions = [];
   const labels = [];
 
-  for (const [genre, pattern] of NEGATION_PATTERNS) {
-    if (pattern.test(raw)) excludedGenres.add(genre);
-  }
-
+  for (const [genre, pattern] of NEGATION_PATTERNS) if (pattern.test(raw)) excludedGenres.add(genre);
   for (const [term, genres] of Object.entries(GENRE_ALIASES)) {
     const pattern = new RegExp(`\\b${term.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&')}\\b`, 'i');
-    if (pattern.test(raw)) {
-      for (const genre of genres) {
-        if (!excludedGenres.has(genre)) requiredGenres.add(genre);
-      }
-    }
+    if (pattern.test(raw)) for (const genre of genres) if (!excludedGenres.has(genre)) requiredGenres.add(genre);
   }
 
   const seasonMatch = lower.match(/(?:no more than|up to|max(?:imum)?|under|less than)\s+(\d+)\s+seasons?/i);
   const runtimeMatch = lower.match(/(?:no more than|up to|max(?:imum)?|under|less than)\s+(\d+)\s*(?:minutes?|mins?)/i);
   const referenceMatch = raw.match(/\b(?:like|similar to)\s+([^,.!?]+?)(?:\s+but\b|\s+without\b|\s+with\b|\s+and\b|$)/i);
+  const topicGroups = detectedTopics(raw);
 
   const intent = {
     raw,
     maxSeasons: seasonMatch ? Number(seasonMatch[1]) : null,
     maxRuntime: runtimeMatch ? Number(runtimeMatch[1]) : (/\b(?:half[- ]hour|short episodes?|quick watch)\b/i.test(raw) ? 35 : null),
-    completedOnly: /\b(?:completed|finished|ended|complete story|no cliffhanger)\b/i.test(raw),
-    requiredGenres: [...requiredGenres],
-    excludedGenres: [...excludedGenres],
-    themes,
-    exclusions,
-    referenceTitle: referenceMatch?.[1]?.trim() || null,
-    referenceGenres: [],
-    topics: requestedTopics(raw),
-    topicTerms: (lower.match(/[a-z0-9-]{4,}/g) || []).filter((token) => !new Set([
-      'documentary','series','show','shows','movie','movies','film','films','watch','something',
-      'completed','finished','under','seasons','season','with','about','that','this','from','like',
-      'want','looking','recommend','please','good','best'
-    ]).has(token)),
+    completedOnly: /\b(?:completed|finished|ended|complete story|no cliffhanger|finished airing)\b/i.test(raw),
+    requiredGenres: [...requiredGenres], excludedGenres: [...excludedGenres], themes, exclusions,
+    referenceTitle: referenceMatch?.[1]?.trim() || null, referenceGenres: [],
+    topicGroups,
+    topicTerms: topicGroups,
+    searchTerms: topicGroups.flatMap((key) => TOPIC_FAMILIES[key]?.searchTerms || []).slice(0, 12),
     labels,
   };
 
-  for (const [name, pattern] of Object.entries(THEME_RULES)) {
-    if (pattern.test(raw)) themes.push(name);
-  }
-
+  for (const [name, pattern] of Object.entries(THEME_RULES)) if (pattern.test(raw)) themes.push(name);
   if (/\b(?:not too dark|less dark|lighter|nothing bleak|not bleak|less depressing|not depressing)\b/i.test(raw)) exclusions.push('dark');
-  if (exclusions.includes('dark')) {
-    const darkIndex = themes.indexOf('dark');
-    if (darkIndex >= 0) themes.splice(darkIndex, 1);
-  }
+  if (exclusions.includes('dark')) { const i = themes.indexOf('dark'); if (i >= 0) themes.splice(i, 1); }
   if (/\b(?:no|not|without|avoid)\s+(?:too\s+much\s+)?(?:violence|violent|gore)\b/i.test(raw)) exclusions.push('violence');
   if (/\b(?:not slow|avoid slow|fast[- ]paced)\b/i.test(raw)) exclusions.push('slow');
 
   if (intent.requiredGenres.length) labels.push(`Required: ${intent.requiredGenres.join(' / ')}`);
+  if (intent.topicGroups.length) labels.push(`Topic: ${intent.topicGroups.join(' / ')}`);
   if (intent.excludedGenres.length) labels.push(`Exclude: ${intent.excludedGenres.join(' / ')}`);
   if (intent.maxSeasons) labels.push(`Maximum ${intent.maxSeasons} seasons`);
   if (intent.maxRuntime) labels.push(`Episodes up to ${intent.maxRuntime} min`);
-  if (intent.completedOnly) labels.push('Completed series');
+  if (intent.completedOnly) labels.push('Finished series');
   if (intent.referenceTitle) labels.push(`Similar to ${intent.referenceTitle}`);
-  if (intent.topics.length) labels.push(`Topic: ${intent.topics.join(' / ')}`);
   if (intent.themes.length) labels.push(`Themes: ${intent.themes.join(', ')}`);
   if (intent.exclusions.length) labels.push(`Avoid: ${intent.exclusions.join(', ')}`);
   if (!labels.length) labels.push('Natural-language request applied');
-
   return intent;
 }
 
@@ -248,18 +261,9 @@ export function showProfile(show) {
   const text = `${title} ${summary} ${genres.join(' ').toLowerCase()}`;
   const seasons = Array.isArray(show?._embedded?.seasons) ? show._embedded.seasons.length : Number(show?.seasonCount || 0);
   const runtime = Number(show?.averageRuntime || show?.runtime || 0);
-
   const scoreWords = (words) => words.reduce((score, word) => score + (text.includes(word) ? 1 : 0), 0);
   return {
-    genres,
-    summary,
-    title,
-    text,
-    seasons,
-    runtime,
-    status: String(show?.status || ''),
-    rating: Number(show?.rating?.average || 0),
-    popularity: Math.min(Number(show?.weight || 0), 100),
+    genres, summary, title, text, seasons, runtime, status: String(show?.status || ''), rating: Number(show?.rating?.average || 0), popularity: Math.min(Number(show?.weight || 0), 100),
     attributes: {
       humour: Math.min(5, (genres.includes('Comedy') ? 3 : 0) + scoreWords(['funny', 'witty', 'satire', 'sitcom', 'comic'])),
       darkness: Math.min(5, (genres.some((g) => ['Horror', 'Thriller', 'Crime'].includes(g)) ? 2 : 0) + scoreWords(['bleak', 'grim', 'disturbing', 'psychological', 'dystopian', 'murder'])),
@@ -274,6 +278,9 @@ export function showProfile(show) {
 function genreMatches(profile, genre) {
   const target = genre.toLowerCase();
   if (profile.genres.some((g) => g.toLowerCase() === target)) return true;
+  // Documentary is a format/genre constraint. A fictional show merely mentioning
+  // a documentary in its synopsis must never qualify as a documentary.
+  if (genre === 'Documentary') return false;
   const semantic = {
     Thriller: /suspense|conspiracy|espionage|hostage|danger|psychological|serial killer|race against time/,
     Mystery: /mystery|detective|investigation|missing|puzzle|whodunnit|twist/,
@@ -288,9 +295,13 @@ function genreMatches(profile, genre) {
     Drama: /drama|emotional|family conflict/,
     Animation: /animated|animation|anime/,
     Family: /family|children|kids|all ages/,
-    Documentary: /documentary|docuseries|nonfiction|non-fiction|real-life|true story/,
   };
   return semantic[genre]?.test(profile.text) || false;
+}
+
+function topicMatches(profile, key) {
+  const family = TOPIC_FAMILIES[key];
+  return Boolean(family?.evidence.test(profile.text));
 }
 
 export function auditPrompt(show, intent) {
@@ -298,31 +309,22 @@ export function auditPrompt(show, intent) {
   const requiredMatches = intent.requiredGenres.filter((genre) => genreMatches(profile, genre));
   const requiredMisses = intent.requiredGenres.filter((genre) => !genreMatches(profile, genre));
   const excludedMatches = intent.excludedGenres.filter((genre) => genreMatches(profile, genre));
+  const topicGroups = Array.isArray(intent.topicGroups) ? intent.topicGroups : [];
+  const topicHits = topicGroups.filter((key) => topicMatches(profile, key));
+  const topicMisses = topicGroups.filter((key) => !topicMatches(profile, key));
   const violations = [];
 
   if (requiredMisses.length) violations.push(`Missing ${requiredMisses.join(' / ')}`);
+  if (topicMisses.length) violations.push(`Missing topic ${topicMisses.join(' / ')}`);
   if (excludedMatches.length) violations.push(`Contains excluded ${excludedMatches.join(' / ')}`);
   if (intent.maxSeasons && (!profile.seasons || profile.seasons > intent.maxSeasons)) violations.push('Season limit');
   if (intent.maxRuntime && (!profile.runtime || profile.runtime > intent.maxRuntime)) violations.push('Runtime limit');
-  if (intent.completedOnly && profile.status !== 'Ended') violations.push('Not completed');
+  if (intent.completedOnly && profile.status !== 'Ended') violations.push('Not finished');
   if (intent.exclusions.includes('dark') && profile.attributes.darkness >= 4) violations.push('Too dark');
   if (intent.exclusions.includes('violence') && /violence|violent|war|murder|killer|combat|torture|gore/.test(profile.text)) violations.push('Violence');
   if (intent.exclusions.includes('slow') && profile.attributes.pace <= 2) violations.push('Too slow');
   if (intent.themes.includes('feelGood') && (profile.attributes.comfort < 2 || profile.attributes.darkness >= 4)) violations.push('Not feel-good');
-  const topics = Array.isArray(intent.topics) ? intent.topics : [];
-  const matchedTopics = topics.filter((topic) => topicMatches(profile, topic));
-  if (topics.length && matchedTopics.length !== topics.length) violations.push('Missing requested topic');
-
-  // For unknown descriptive terms, keep the old lexical guard when a format/genre
-  // was explicitly requested. Known topic families above are stronger and work
-  // even for a bare query such as "history" or "nature".
-  const topicTerms = Array.isArray(intent.topicTerms) ? intent.topicTerms : [];
-  if (!topics.length && topicTerms.length && intent.requiredGenres.length) {
-    const lexicalMatches = topicTerms.filter((term) => profile.text.includes(term));
-    if (!lexicalMatches.length) violations.push('Missing requested topic');
-  }
-
-  return { passed: violations.length === 0, violations, requiredMatches, profile };
+  return { passed: violations.length === 0, violations, requiredMatches, topicHits, profile };
 }
 
 function themeScore(profile, themes) {
@@ -344,12 +346,9 @@ export function scorePrompt(show, query, intent) {
   const audit = auditPrompt(show, intent);
   if (!audit.passed) return { passed: false, score: -999, reasons: [], audit };
   const p = audit.profile;
-  let score = audit.requiredMatches.length * 30;
-  score += (intent.topics || []).length * 35;
+  let score = audit.requiredMatches.length * 30 + audit.topicHits.length * 35;
   score += themeScore(p, intent.themes);
-  score += Math.min(p.rating, 10) * 1.2;
-  score += p.popularity / 40;
-
+  score += Math.min(p.rating, 10) * 1.2 + p.popularity / 80;
   if (intent.completedOnly) score += 8;
   if (intent.maxSeasons && p.seasons <= intent.maxSeasons) score += 5;
   if (intent.maxRuntime && p.runtime <= intent.maxRuntime) score += 5;
@@ -361,25 +360,12 @@ export function scorePrompt(show, query, intent) {
       .reduce((total, key) => total + Math.max(0, 5 - Math.abs((reference[key] || 0) - (current[key] || 0))), 0);
     score += similarity * 0.8;
   }
-
-  const intentWords = new Set([
-    'happy', 'happier', 'cheerful', 'joyful', 'feel-good', 'uplifting',
-    'positive', 'lighthearted', 'heartwarming', 'comforting', 'funny',
-    'dark', 'gripping', 'clever', 'completed', 'finished', 'seasons',
-    'season', 'series', 'shows', 'show', 'something', 'watch',
-  ]);
-  const tokens = (String(query || '').toLowerCase().match(/[a-z0-9-]{4,}/g) || [])
-    .filter((token) => !intentWords.has(token));
-  for (const token of tokens) {
-    if (p.title.includes(token)) score += 1;
-    else if (p.text.includes(token)) score += 0.4;
-  }
   if (!show?.image?.medium && !show?.image?.original) score -= 15;
 
   const reasons = [];
   if (audit.requiredMatches.length) reasons.push(`Required match: ${audit.requiredMatches.join(' / ')}`);
-  if (intent.topics?.length) reasons.push(`Topic: ${intent.topics.join(' / ')}`);
-  if (intent.completedOnly) reasons.push('Completed series');
+  if (audit.topicHits.length) reasons.push(`Topic match: ${audit.topicHits.join(' / ')}`);
+  if (intent.completedOnly) reasons.push('Finished series');
   if (intent.maxSeasons) reasons.push(`${p.seasons} seasons — within your limit`);
   if (intent.maxRuntime) reasons.push(`${p.runtime}-minute episodes — within your limit`);
   if (intent.referenceGenres?.length) reasons.push(`Shares genres with ${intent.referenceName || intent.referenceTitle}`);
@@ -388,53 +374,27 @@ export function scorePrompt(show, query, intent) {
   if (intent.themes.includes('light') && p.attributes.comfort >= 3) reasons.push('Lighter, more comforting tone');
   if (intent.themes.includes('feelGood') && p.attributes.comfort >= 2) reasons.push('Warm, upbeat feel-good tone');
   if (p.rating) reasons.push(`Rated ${p.rating}/10`);
-
   return { passed: true, score, reasons: reasons.slice(0, 5), audit };
 }
 
 export function scoreMood(show, mood) {
-  const profileDefinition = MOOD_PROFILES[mood];
-  if (!profileDefinition) return { passed: false, score: -999, reasons: [] };
+  const def = MOOD_PROFILES[mood];
+  if (!def) return { passed: false, score: -999, reasons: [] };
   const profile = showProfile(show);
   let score = 0;
   const evidence = [];
-
-  for (const [genre, weight] of Object.entries(profileDefinition.genres)) {
-    if (genreMatches(profile, genre)) {
-      score += weight;
-      evidence.push(`${genre} tone`);
-    }
-  }
-  for (const [word, weight] of Object.entries(profileDefinition.themes)) {
-    if (profile.text.includes(word)) {
-      score += weight;
-      evidence.push(`${word} themes`);
-    }
-  }
-  for (const [word, penalty] of Object.entries(profileDefinition.penalties)) {
-    if (profile.text.includes(word)) score -= penalty;
-  }
-
+  for (const [genre, weight] of Object.entries(def.genres)) if (genreMatches(profile, genre)) { score += weight; evidence.push(`${genre} tone`); }
+  for (const [word, weight] of Object.entries(def.themes)) if (profile.text.includes(word)) { score += weight; evidence.push(`${word} themes`); }
+  for (const [word, penalty] of Object.entries(def.penalties)) if (profile.text.includes(word)) score -= penalty;
   if (mood === 'dark') score += profile.attributes.darkness * 1.8;
   if (mood === 'funny') score += profile.attributes.humour * 2;
   if (mood === 'comforting') score += profile.attributes.comfort * 2 - profile.attributes.darkness;
   if (mood === 'clever') score += profile.attributes.complexity * 2;
   if (mood === 'gripping') score += profile.attributes.intensity * 2;
-
   score += profile.rating * 0.7 + profile.popularity / 60;
-  const passed = score >= profileDefinition.minScore && evidence.length > 0;
-  return {
-    passed,
-    score,
-    reasons: [`Mood: ${profileDefinition.label}`, ...evidence.slice(0, 3), profile.rating ? `Rated ${profile.rating}/10` : null].filter(Boolean),
-    profile,
-  };
+  const passed = score >= def.minScore && evidence.length > 0;
+  return { passed, score, reasons: [`Mood: ${def.label}`, ...evidence.slice(0, 3), profile.rating ? `Rated ${profile.rating}/10` : null].filter(Boolean), profile };
 }
 
-export function moodLabel(mood) {
-  return MOOD_PROFILES[mood]?.label || null;
-}
-
-export function knownMoods() {
-  return Object.keys(MOOD_PROFILES);
-}
+export function moodLabel(mood) { return MOOD_PROFILES[mood]?.label || null; }
+export function knownMoods() { return Object.keys(MOOD_PROFILES); }

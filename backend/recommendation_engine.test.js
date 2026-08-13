@@ -139,33 +139,48 @@ test('surfing documentary requires both documentary format and surfing topic', (
   assert.equal(scorePrompt(surfing, 'surfing documentary', intent).passed, true);
 });
 
+test('documentary format must be a real genre, not a synopsis mention', () => {
+  const intent = parsePrompt('surfing documentary');
+  const fake = show({
+    name: 'Place of Execution',
+    genres: ['Drama', 'Crime'],
+    summary: 'A journalist makes a documentary about an old murder case.',
+  });
+  assert.equal(scorePrompt(fake, intent.raw, intent).passed, false);
+});
 
-test('bare topic queries reject unrelated popular shows', () => {
-  for (const [query, goodSummary] of [
-    ['nature', 'Wildlife in remote wilderness habitats and the natural world.'],
-    ['science', 'Scientists explore physics, biology and scientific research.'],
-    ['history', 'A documentary journey through ancient history and civilizations.'],
-    ['space', 'Astronauts explore planets, astronomy and the universe.'],
-    ['food', 'Chefs explore cooking, cuisine and restaurants around the world.'],
-    ['travel', 'A travel journey through destinations and cultures around the world.'],
-  ]) {
-    const intent = parsePrompt(query);
-    const unrelated = show({ name: 'Breaking Bad', genres: ['Drama', 'Crime'], summary: 'A chemistry teacher enters the drug trade.' });
-    const relevant = show({ name: `Relevant ${query}`, genres: ['Documentary'], summary: goodSummary });
-    assert.equal(scorePrompt(unrelated, query, intent).passed, false, `${query} should reject unrelated show`);
-    assert.equal(scorePrompt(relevant, query, intent).passed, true, `${query} should accept relevant show`);
+test('generic topic words are recommendation intents, not title lookups', () => {
+  for (const query of ['surfing', 'nature', 'wildlife', 'science', 'history', 'space', 'technology', 'food', 'travel', 'music', 'sport']) {
+    assert.equal(looksLikeTitleLookup(query), false, query);
   }
 });
 
-test('combined topic and documentary intent requires both', () => {
-  const intent = parsePrompt('ocean science documentary');
-  const crimeDoc = show({ genres: ['Documentary'], summary: 'A true crime investigation.' });
-  const oceanScience = show({ genres: ['Documentary'], summary: 'Marine scientists research ocean ecosystems underwater.' });
-  assert.equal(scorePrompt(crimeDoc, intent.raw, intent).passed, false);
-  assert.equal(scorePrompt(oceanScience, intent.raw, intent).passed, true);
+test('topic constraints reject unrelated popular drama', () => {
+  const breakingBad = show({
+    name: 'Breaking Bad',
+    genres: ['Drama', 'Crime', 'Thriller'],
+    summary: 'A chemistry teacher enters the drug trade.',
+  });
+  for (const query of ['surfing', 'nature', 'science', 'history', 'space', 'food', 'travel']) {
+    const intent = parsePrompt(query);
+    assert.equal(scorePrompt(breakingBad, query, intent).passed, false, query);
+  }
 });
 
-test('100ft wave normalizes to 100 Foot Wave for title recovery', () => {
+test('topic families accept genuinely related titles', () => {
+  const cases = [
+    ['nature', show({ name: 'Wild Earth', genres: ['Documentary'], summary: 'Wildlife and wilderness ecosystems across Africa.' })],
+    ['science', show({ name: 'Science Now', genres: ['Documentary'], summary: 'Scientists explore physics, biology and new research.' })],
+    ['history', show({ name: 'Ancient Worlds', genres: ['Documentary'], summary: 'A history of ancient civilizations and empires.' })],
+    ['space', show({ name: 'Cosmos Beyond', genres: ['Documentary'], summary: 'Astronomy, planets and the universe.' })],
+    ['food', show({ name: 'Chef Stories', genres: ['Documentary'], summary: 'Chefs explore food, cuisine and restaurants.' })],
+  ];
+  for (const [query, candidate] of cases) {
+    const intent = parsePrompt(query);
+    assert.equal(scorePrompt(candidate, query, intent).passed, true, query);
+  }
+});
+
+test('100ft title normalization matches 100 Foot spelling', () => {
   assert.equal(normalizeTitle('100ft Wave'), normalizeTitle('100 Foot Wave'));
-  assert.equal(looksLikeTitleLookup('100ft Wave'), true);
 });

@@ -825,19 +825,13 @@ async function exactTitleCandidate(query) {
   if (!shouldTryDirectTitleLookup(query)) return null;
 
   let searchResults = [];
-  try {
-    searchResults = await tvMazeSearch(query);
-    const expandedQuery = normalizeTitle(query);
-    if (expandedQuery && expandedQuery !== String(query).toLowerCase().trim()) {
-      const expandedResults = await tvMazeSearch(expandedQuery);
-      const merged = new Map();
-      for (const item of [...searchResults, ...expandedResults]) {
-        if (item?.show?.id) merged.set(item.show.id, item);
-      }
-      searchResults = [...merged.values()];
+  const variants = [...new Set([query, normalizeTitle(query).replace(/\b(\d+) foot\b/g, '$1 Foot')])];
+  for (const variant of variants) {
+    try {
+      searchResults.push(...await tvMazeSearch(variant));
+    } catch {
+      // We can still try the cached catalogue below.
     }
-  } catch {
-    // We can still try the cached catalogue below.
   }
 
   const wanted = normalizeTitle(query);
@@ -884,10 +878,18 @@ async function exactTitleCandidate(query) {
 async function promptCandidatesV2(query, intent) {
   const catalogue = await catalogueShows();
   const pool = new Map(catalogue.map((show) => [show.id, show]));
+  const searches = new Set();
   const cleaned = queryTokens(query).slice(0, 6).join(' ');
-  if (cleaned) {
+  if (cleaned) searches.add(cleaned);
+  for (const term of intent.searchTerms || []) searches.add(term);
+  if (intent.requiredGenres?.includes('Documentary')) searches.add('documentary');
+
+  // Retrieval may be broad, but the recommendation engine applies strict
+  // topic/genre gates afterwards. This prevents popularity filler while still
+  // allowing sparse topics to pull candidates beyond the cached catalogue pages.
+  for (const search of [...searches].slice(0, 10)) {
     try {
-      for (const item of await tvMazeSearch(cleaned)) {
+      for (const item of await tvMazeSearch(search)) {
         if (item?.show?.id) pool.set(item.show.id, item.show);
       }
     } catch {
