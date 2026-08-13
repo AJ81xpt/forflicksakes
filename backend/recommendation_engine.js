@@ -25,7 +25,7 @@ export function looksLikeTitleLookup(query) {
 
   // These constructions clearly describe intent rather than naming a title.
   const intentPatterns = [
-    /\b(?:something|anything|show|series|programme|program|watch)\b/i,
+    /\b(?:something|anything|show|series|programme|program|watch|documentary|docuseries|movie|film)\b/i,
     /\b(?:i\s+(?:want|need|feel like|am looking for)|looking for|find me|recommend)\b/i,
     /\b(?:like|similar to)\b/i,
     /\b(?:under|over|less than|more than|no more than|up to|max(?:imum)?)\b/i,
@@ -67,6 +67,7 @@ const GENRE_ALIASES = {
   'sci-fi': ['Science-Fiction'],
   scifi: ['Science-Fiction'],
   'science fiction': ['Science-Fiction'],
+  documentary: ['Documentary'],
 };
 
 const MOOD_PROFILES = {
@@ -163,6 +164,11 @@ export function parsePrompt(query) {
     exclusions,
     referenceTitle: referenceMatch?.[1]?.trim() || null,
     referenceGenres: [],
+    topicTerms: (lower.match(/[a-z0-9-]{4,}/g) || []).filter((token) => !new Set([
+      'documentary','series','show','shows','movie','movies','film','films','watch','something',
+      'completed','finished','under','seasons','season','with','about','that','this','from','like',
+      'want','looking','recommend','please','good','best'
+    ]).has(token)),
     labels,
   };
 
@@ -238,6 +244,7 @@ function genreMatches(profile, genre) {
     Drama: /drama|emotional|family conflict/,
     Animation: /animated|animation|anime/,
     Family: /family|children|kids|all ages/,
+    Documentary: /documentary|docuseries|nonfiction|non-fiction|real-life|true story/,
   };
   return semantic[genre]?.test(profile.text) || false;
 }
@@ -258,6 +265,11 @@ export function auditPrompt(show, intent) {
   if (intent.exclusions.includes('violence') && /violence|violent|war|murder|killer|combat|torture|gore/.test(profile.text)) violations.push('Violence');
   if (intent.exclusions.includes('slow') && profile.attributes.pace <= 2) violations.push('Too slow');
   if (intent.themes.includes('feelGood') && (profile.attributes.comfort < 2 || profile.attributes.darkness >= 4)) violations.push('Not feel-good');
+  const topicTerms = Array.isArray(intent.topicTerms) ? intent.topicTerms : [];
+  if (topicTerms.length && intent.requiredGenres.length) {
+    const topicMatches = topicTerms.filter((term) => profile.text.includes(term));
+    if (!topicMatches.length) violations.push('Missing requested topic');
+  }
 
   return { passed: violations.length === 0, violations, requiredMatches, profile };
 }

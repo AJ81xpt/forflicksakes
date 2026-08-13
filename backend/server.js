@@ -969,15 +969,19 @@ app.post('/recommendations', async (request, response) => {
       }
     }
 
+    const excludedIds = new Set(
+      (Array.isArray(request.body?.profile?.excludedIds) ? request.body.profile.excludedIds : [])
+        .map(Number).filter(Number.isFinite),
+    );
     response.json({
       mode,
       mood,
       interpretation,
       results: candidates
         .map(({ show, score, reasons }) => toShowItem(show, score, reasons))
-        .filter((item) => item.poster && item.title)
+        .filter((item) => item.poster && item.title && !excludedIds.has(Number(item.id)))
         .sort((a, b) => b.recommendationScore - a.recommendationScore)
-        .slice(0, 5),
+        .slice(0, 10),
     });
   } catch (error) {
     console.error(error);

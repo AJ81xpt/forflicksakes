@@ -127,3 +127,14 @@ test('reference profile rewards a closer vibe match', () => {
   const far = show({ name: 'Far Match', genres: ['Comedy', 'Romance'], summary: '<p>A warm uplifting community romance.</p>' });
   assert.ok(scorePrompt(close, intent.raw, intent).score > scorePrompt(far, intent.raw, intent).score);
 });
+
+
+test('surfing documentary requires both documentary format and surfing topic', () => {
+  const intent = parsePrompt('surfing documentary');
+  assert.equal(looksLikeTitleLookup('surfing documentary'), false);
+  assert.deepEqual(intent.requiredGenres, ['Documentary']);
+  const unrelated = show({ name: 'Breaking Bad', genres: ['Drama', 'Crime'], summary: 'A chemistry teacher enters the drug trade.' });
+  assert.equal(scorePrompt(unrelated, 'surfing documentary', intent).passed, false);
+  const surfing = show({ name: 'Surf Stories', genres: ['Documentary'], summary: 'A documentary following surfers and surfing culture around the world.' });
+  assert.equal(scorePrompt(surfing, 'surfing documentary', intent).passed, true);
+});
