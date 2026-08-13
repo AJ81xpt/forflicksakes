@@ -382,6 +382,151 @@ async function tvMazeShowDetails(id) {
   return tvMazeJson(`https://api.tvmaze.com/shows/${id}?embed[]=seasons&embed[]=cast&embed[]=episodes`);
 }
 
+
+// Discovery and streaming availability are deliberately separate concerns.
+// Topic discovery uses a small union of catalogue countries so a title can be
+// recommended even when it is not streamable in the user's current region.
+// The user's region is only applied later by /shows/:id/providers.
+const DISCOVERY_COUNTRIES = String(process.env.DISCOVERY_COUNTRIES || 'us,gb,pt')
+  .split(',')
+  .map((value) => value.trim().toLowerCase())
+  .filter(Boolean)
+  .slice(0, 5);
+const discoverySearchCache = new Map();
+const DISCOVERY_SEARCH_TTL_MS = 15 * 60 * 1000;
+
+function readDiscoverySearchCache(key) {
+  const entry = discoverySearchCache.get(key);
+  if (!entry) return null;
+  if (entry.expiresAt <= Date.now()) {
+    discoverySearchCache.delete(key);
+    return null;
+  }
+  return entry.value;
+}
+
+function writeDiscoverySearchCache(key, value) {
+  discoverySearchCache.set(key, {
+    value,
+    expiresAt: Date.now() + DISCOVERY_SEARCH_TTL_MS,
+  });
+  return value;
+}
+
+async function streamingAvailabilityFilterSearch({ country, keyword, genres }) {
+  if (!streamingAvailabilityKey) return [];
+  const url = new URL('https://api.movieofthenight.com/v4/shows/search/filters');
+  url.searchParams.set('country', String(country).toLowerCase());
+  if (keyword) url.searchParams.set('keyword', keyword);
+  if (genres?.length) url.searchParams.set('genres', genres.join(','));
+  url.searchParams.set('order_by', 'rating');
+  url.searchParams.set('order_direction', 'desc');
+  url.searchParams.set('output_language', 'en');
+
+  const response = await fetch(url, {
+    headers: {
+      'X-API-Key': streamingAvailabilityKey,
+      'Accept': 'application/json',
+      'User-Agent': 'ForFlickSakes/2.0',
+    },
+    signal: AbortSignal.timeout(12000),
+  });
+
+  if (!response.ok) {
+    if ([401, 403, 429].includes(response.status)) return [];
+    throw new Error(`Discovery search returned ${response.status}`);
+  }
+  const data = await response.json();
+  return Array.isArray(data?.shows) ? data.shows : [];
+}
+
+function externalDiscoveryTitle(show) {
+  return String(
+    show?.title ||
+    show?.originalTitle ||
+    show?.name ||
+    show?.originalName ||
+    '',
+  ).trim();
+}
+
+function discoveryKeywords(query, intent) {
+  const values = [];
+  const add = (value) => {
+    const cleaned = String(value || '').trim();
+    if (!cleaned) return;
+    if (!values.some((item) => normalizeTitle(item) === normalizeTitle(cleaned))) values.push(cleaned);
+  };
+
+  // Topic keys are the strongest semantic query. Search aliases help sparse
+  // topics such as surfing where the title itself may not contain "surfing".
+  for (const topic of intent.topicGroups || []) add(topic);
+  for (const term of intent.searchTerms || []) add(term);
+
+  // For a descriptive request with no detected topic, keep a cleaned keyword
+  // query as a last resort. Do not use this for bare genre-only requests.
+  if (!(intent.topicGroups || []).length && !(intent.requiredGenres || []).length) {
+    add(queryTokens(query).slice(0, 5).join(' '));
+  }
+  return values.slice(0, 4);
+}
+
+async function externalTopicDiscovery(query, intent) {
+  if (!streamingAvailabilityKey) return [];
+  const keywords = discoveryKeywords(query, intent);
+  const genreIds = intent.requiredGenres?.includes('Documentary') ? ['documentary'] : [];
+  if (!keywords.length && !genreIds.length) return [];
+
+  const cacheKey = JSON.stringify({ keywords, genreIds, countries: DISCOVERY_COUNTRIES });
+  const cached = readDiscoverySearchCache(cacheKey);
+  if (cached) return cached;
+
+  const requests = [];
+  for (const country of DISCOVERY_COUNTRIES) {
+    if (keywords.length) {
+      for (const keyword of keywords) {
+        requests.push(streamingAvailabilityFilterSearch({ country, keyword, genres: genreIds }));
+      }
+    } else {
+      requests.push(streamingAvailabilityFilterSearch({ country, keyword: null, genres: genreIds }));
+    }
+  }
+
+  const settled = await Promise.allSettled(requests);
+  const titles = [];
+  const seen = new Set();
+  for (const result of settled) {
+    if (result.status !== 'fulfilled') continue;
+    for (const show of result.value) {
+      const title = externalDiscoveryTitle(show);
+      const key = normalizeTitle(title);
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      titles.push(title);
+      if (titles.length >= 30) break;
+    }
+    if (titles.length >= 30) break;
+  }
+  return writeDiscoverySearchCache(cacheKey, titles);
+}
+
+async function mapDiscoveryTitlesToTvMaze(titles) {
+  const selected = titles.slice(0, 24);
+  const resolved = await Promise.all(selected.map(async (title) => {
+    try {
+      const matches = await tvMazeSearch(title);
+      const shows = matches.map((item) => item?.show).filter(Boolean);
+      const wanted = normalizeTitle(title);
+      return shows.find((show) => normalizeTitle(show.name) === wanted)
+        || conservativeFuzzyTitleMatch(title, shows)?.show
+        || null;
+    } catch {
+      return null;
+    }
+  }));
+  return resolved.filter(Boolean);
+}
+
 async function catalogueShows() {
   if (catalogueCache.expiresAt > Date.now() && catalogueCache.shows.length) {
     return catalogueCache.shows;
@@ -884,9 +1029,9 @@ async function promptCandidatesV2(query, intent) {
   for (const term of intent.searchTerms || []) searches.add(term);
   if (intent.requiredGenres?.includes('Documentary')) searches.add('documentary');
 
-  // Retrieval may be broad, but the recommendation engine applies strict
-  // topic/genre gates afterwards. This prevents popularity filler while still
-  // allowing sparse topics to pull candidates beyond the cached catalogue pages.
+  // TVMaze search is title-oriented, which is excellent for exact-title lookup
+  // but weak for semantic topics in summaries (for example, "surfing" does not
+  // appear in the title "100 Foot Wave"). Keep it as one retrieval source.
   for (const search of [...searches].slice(0, 10)) {
     try {
       for (const item of await tvMazeSearch(search)) {
@@ -897,8 +1042,21 @@ async function promptCandidatesV2(query, intent) {
     }
   }
 
+  // Use Streaming Availability API's keyword/genre search only as a discovery
+  // index, across fixed discovery countries independent of the user's region.
+  // Convert discovered titles back to TVMaze IDs so show details and Where to
+  // Watch continue to use the existing stable app model.
+  try {
+    const discoveredTitles = await externalTopicDiscovery(query, intent);
+    const discoveredShows = await mapDiscoveryTitlesToTvMaze(discoveredTitles);
+    for (const show of discoveredShows) if (show?.id) pool.set(show.id, show);
+  } catch (error) {
+    console.warn('[DISCOVERY] supplemental search unavailable:', error?.message || error);
+  }
+
   // Cheap pre-ranking limits detail calls, then strict filters run against
-  // enriched shows where season counts are known.
+  // enriched shows where season counts are known. Region/streaming availability
+  // is intentionally NOT part of this ranking.
   const preRanked = [...pool.values()]
     .map((show) => {
       const provisional = scorePromptV2(show, query, {
@@ -912,7 +1070,7 @@ async function promptCandidatesV2(query, intent) {
     .sort((a, b) => b.score - a.score)
     .map((item) => item.show);
 
-  const enriched = await enrichShowsV2(preRanked, 36);
+  const enriched = await enrichShowsV2(preRanked, 48);
   return enriched
     .map((show) => ({ show, ...scorePromptV2(show, query, intent) }))
     .filter((item) => item.passed && item.score >= (intent.requiredGenres.length ? 24 : 8))
