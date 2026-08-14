@@ -1029,59 +1029,88 @@ async function exactTitleCandidate(query) {
 async function promptCandidatesV2(query, intent) {
   const catalogue = await catalogueShows();
   const pool = new Map(catalogue.map((show) => [show.id, show]));
+  const priorityIds = new Set();
   const searches = new Set();
   const cleaned = queryTokens(query).slice(0, 6).join(' ');
   if (cleaned) searches.add(cleaned);
   for (const term of intent.searchTerms || []) searches.add(term);
+  for (const topic of intent.topicGroups || []) searches.add(topic);
   if (intent.requiredGenres?.includes('Documentary')) searches.add('documentary');
 
-  // TVMaze search is title-oriented, which is excellent for exact-title lookup
-  // but weak for semantic topics in summaries (for example, "surfing" does not
-  // appear in the title "100 Foot Wave"). Keep it as one retrieval source.
-  for (const search of [...searches].slice(0, 10)) {
+  // Title search is useful for exact/near-title candidates. Anything found here
+  // is kept in the priority set so it cannot be buried by the generic catalogue.
+  for (const search of [...searches].slice(0, 12)) {
     try {
       for (const item of await tvMazeSearch(search)) {
-        if (item?.show?.id) pool.set(item.show.id, item.show);
+        if (!item?.show?.id) continue;
+        pool.set(item.show.id, item.show);
+        priorityIds.add(item.show.id);
       }
-    } catch {
-      // Cached catalogue remains available.
+    } catch (error) {
+      console.warn('[DISCOVERY] TVMaze search failed:', search, error?.message || error);
     }
   }
 
-  // Use Streaming Availability API's keyword/genre search only as a discovery
-  // index, across fixed discovery countries independent of the user's region.
-  // Convert discovered titles back to TVMaze IDs so show details and Where to
-  // Watch continue to use the existing stable app model.
+  let discoveredTitleCount = 0;
+  let mappedDiscoveryCount = 0;
   try {
     const discoveredTitles = await externalTopicDiscovery(query, intent);
+    discoveredTitleCount = discoveredTitles.length;
     const discoveredShows = await mapDiscoveryTitlesToTvMaze(discoveredTitles);
-    for (const show of discoveredShows) if (show?.id) pool.set(show.id, show);
+    mappedDiscoveryCount = discoveredShows.filter(Boolean).length;
+    for (const show of discoveredShows) {
+      if (!show?.id) continue;
+      pool.set(show.id, show);
+      priorityIds.add(show.id);
+    }
   } catch (error) {
     console.warn('[DISCOVERY] supplemental search unavailable:', error?.message || error);
   }
 
-  // Cheap pre-ranking limits detail calls, then strict filters run against
-  // enriched shows where season counts are known. Region/streaming availability
-  // is intentionally NOT part of this ranking.
-  const preRanked = [...pool.values()]
+  // IMPORTANT: do not strictly reject candidates before enrichment. Topic and
+  // format evidence can live in fields only available on the full show object.
+  // First enrich all candidates discovered specifically for this query, then
+  // fill the remaining budget with the strongest generic catalogue candidates.
+  const provisional = [...pool.values()]
     .map((show) => {
-      const provisional = scorePromptV2(show, query, {
+      const scored = scorePromptV2(show, query, {
         ...intent,
         maxSeasons: null,
         maxRuntime: null,
         completedOnly: false,
       });
-      return { show, score: provisional.score };
+      return { show, score: Number(scored.score || 0) };
     })
-    .sort((a, b) => b.score - a.score)
-    .map((item) => item.show);
+    .sort((a, b) => b.score - a.score);
 
-  const enriched = await enrichShowsV2(preRanked, 48);
-  return enriched
+  const priorityShows = [...priorityIds]
+    .map((id) => pool.get(id))
+    .filter(Boolean);
+  const prioritySet = new Set(priorityShows.map((show) => show.id));
+  const fallbackShows = provisional
+    .map((item) => item.show)
+    .filter((show) => !prioritySet.has(show.id));
+
+  const enrichmentQueue = [...priorityShows, ...fallbackShows].slice(0, 64);
+  const enriched = await enrichShowsV2(enrichmentQueue, 64);
+  const ranked = enriched
     .map((show) => ({ show, ...scorePromptV2(show, query, intent) }))
     .filter((item) => item.passed && item.score >= (intent.requiredGenres.length ? 24 : 8))
     .sort((a, b) => b.score - a.score)
     .slice(0, 8);
+
+  console.log('[DISCOVERY]', JSON.stringify({
+    query,
+    searches: [...searches].slice(0, 12),
+    externalTitles: discoveredTitleCount,
+    mappedExternalTitles: mappedDiscoveryCount,
+    priorityCandidates: priorityShows.length,
+    enrichmentQueue: enrichmentQueue.length,
+    strictMatches: ranked.length,
+    strictMatchTitles: ranked.map((item) => item.show?.name).filter(Boolean),
+  }));
+
+  return ranked;
 }
 
 async function moodCandidatesV2(mood) {
