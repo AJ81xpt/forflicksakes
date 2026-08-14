@@ -413,12 +413,15 @@ function writeDiscoverySearchCache(key, value) {
   return value;
 }
 
-async function streamingAvailabilityFilterSearch({ country, keyword, genres }) {
+async function streamingAvailabilityFilterSearch({ country, keyword, genres, catalogs }) {
   if (!streamingAvailabilityKey) return [];
   const url = new URL('https://api.movieofthenight.com/v4/shows/search/filters');
   url.searchParams.set('country', String(country).toLowerCase());
   if (keyword) url.searchParams.set('keyword', keyword);
   if (genres?.length) url.searchParams.set('genres', genres.join(','));
+  if (catalogs?.length) url.searchParams.set('catalogs', catalogs.join(','));
+  url.searchParams.set('show_type', 'series');
+  url.searchParams.set('series_granularity', 'show');
   url.searchParams.set('order_by', 'rating');
   url.searchParams.set('order_direction', 'desc');
   url.searchParams.set('output_language', 'en');
@@ -458,10 +461,16 @@ function discoveryKeywords(query, intent) {
     if (!values.some((item) => normalizeTitle(item) === normalizeTitle(cleaned))) values.push(cleaned);
   };
 
+  // Preserve compound intent before expanding it into topic/genre terms.
+  add(queryTokens(query).slice(0, 7).join(' '));
+
   // Topic keys are the strongest semantic query. Search aliases help sparse
   // topics such as surfing where the title itself may not contain "surfing".
   for (const topic of intent.topicGroups || []) add(topic);
   for (const term of intent.searchTerms || []) add(term);
+  for (const genre of intent.requiredGenres || []) {
+    if (genre !== 'Documentary') add(genre.toLowerCase());
+  }
 
   // A bare documentary request needs an active retrieval seed. Documentary
   // is a TVMaze show type, not a reliable Streaming Availability genre id.
@@ -477,24 +486,47 @@ function discoveryKeywords(query, intent) {
   return values.slice(0, 4);
 }
 
-async function externalTopicDiscovery(query, intent) {
+const STREAMING_CATALOG_IDS = {
+  'netflix': 'netflix',
+  'prime video': 'prime',
+  'amazon prime video': 'prime',
+  'apple tv+': 'apple',
+  'apple tv plus': 'apple',
+  'disney+': 'disney',
+  'disney plus': 'disney',
+  'hbo max': 'hbo',
+  'max': 'hbo',
+  'showmax': 'showmax',
+  'dstv stream': 'dstv',
+};
+
+function requestedCatalogIds(services) {
+  return [...new Set((Array.isArray(services) ? services : [])
+    .map((value) => STREAMING_CATALOG_IDS[String(value || '').trim().toLowerCase()])
+    .filter(Boolean))];
+}
+
+async function externalTopicDiscovery(query, intent, profile = {}) {
   if (!streamingAvailabilityKey) return [];
   const keywords = discoveryKeywords(query, intent);
   const genreIds = []; // Documentary is treated as a format/type after retrieval, not as a provider genre filter.
   if (!keywords.length && !genreIds.length) return [];
 
-  const cacheKey = JSON.stringify({ keywords, genreIds, countries: DISCOVERY_COUNTRIES });
+  const catalogs = requestedCatalogIds(profile.services);
+  const requestedRegion = String(profile.region || '').trim().toLowerCase();
+  const countries = catalogs.length && requestedRegion ? [requestedRegion] : DISCOVERY_COUNTRIES;
+  const cacheKey = JSON.stringify({ keywords, genreIds, countries, catalogs });
   const cached = readDiscoverySearchCache(cacheKey);
   if (cached) return cached;
 
   const requests = [];
-  for (const country of DISCOVERY_COUNTRIES) {
+  for (const country of countries) {
     if (keywords.length) {
       for (const keyword of keywords) {
-        requests.push(streamingAvailabilityFilterSearch({ country, keyword, genres: genreIds }));
+        requests.push(streamingAvailabilityFilterSearch({ country, keyword, genres: genreIds, catalogs }));
       }
     } else {
-      requests.push(streamingAvailabilityFilterSearch({ country, keyword: null, genres: genreIds }));
+      requests.push(streamingAvailabilityFilterSearch({ country, keyword: null, genres: genreIds, catalogs }));
     }
   }
 
@@ -559,7 +591,6 @@ function parsePrompt(query) {
   const raw = String(query || '').trim();
   const text = raw.toLowerCase();
   const result = {
-    maxSeasons: null,
     maxRuntime: null,
     completedOnly: false,
     requiredGenres: [],
@@ -570,11 +601,6 @@ function parsePrompt(query) {
     labels: [],
   };
 
-  const seasonMatch = text.match(/(?:no more than|up to|max(?:imum)?|under|less than)\s+(\d+)\s+seasons?/i);
-  if (seasonMatch) {
-    result.maxSeasons = Number(seasonMatch[1]);
-    result.labels.push(`Maximum ${seasonMatch[1]} seasons`);
-  }
 
   const runtimeMatch = text.match(/(?:under|less than|no more than|up to|max(?:imum)?)\s+(\d+)\s*(?:minutes?|mins?)/i);
   if (runtimeMatch) {
@@ -710,7 +736,6 @@ function promptMatchAudit(show, interpretation) {
     !semanticGenreMatch(facts, genre),
   );
   const passed = requiredMisses.length === 0
-    && !(interpretation.maxSeasons && facts.seasons && facts.seasons > interpretation.maxSeasons)
     && !(interpretation.maxRuntime && facts.runtime && facts.runtime > interpretation.maxRuntime)
     && !(interpretation.completedOnly && show.status !== 'Ended')
     && !interpretation.excludedGenres.some((genre) => semanticGenreMatch(facts, genre))
@@ -758,7 +783,6 @@ function promptScore(show, query, interpretation) {
     else if (facts.haystack.includes(token)) score += 1.1;
   }
   if (interpretation.completedOnly && show.status === 'Ended') score += 5;
-  if (interpretation.maxSeasons && facts.seasons && facts.seasons <= interpretation.maxSeasons) score += 3;
   if (interpretation.maxRuntime && facts.runtime && facts.runtime <= interpretation.maxRuntime) score += 3;
   if (!show.image?.medium && !show.image?.original) score -= 12;
   if (!show.summary) score -= 4;
@@ -770,7 +794,6 @@ function promptReasons(show, interpretation) {
   const reasons = [];
   if (audit.requiredMatches.length) reasons.push(`Required match: ${audit.requiredMatches.join(' / ')}`);
   if (interpretation.completedOnly && show.status === 'Ended') reasons.push('Completed series');
-  if (interpretation.maxSeasons && audit.facts.seasons) reasons.push(`Within limit: ${audit.facts.seasons} seasons`);
   if (interpretation.maxRuntime && audit.facts.runtime) reasons.push(`Within limit: ${audit.facts.runtime}-minute episodes`);
   if (interpretation.referenceGenres?.length) reasons.push(`Shares themes with ${interpretation.referenceName || interpretation.referenceTitle}`);
   if (show.rating?.average) reasons.push(`Rated ${show.rating.average}/10`);
@@ -783,7 +806,7 @@ function moodReasons(show, mood, moodInfo) {
   return reasons.slice(0, 5);
 }
 
-function toShowItem(show, score = 0, matchReasons = []) {
+function toShowItem(show, score = 0, matchReasons = [], confidence = null) {
   const embeddedSeasons = show?._embedded?.seasons;
   return {
     id: show.id,
@@ -800,7 +823,7 @@ function toShowItem(show, score = 0, matchReasons = []) {
     officialUrl: show.officialSite || show.url || null,
     source: 'TVMaze',
     recommendationScore: score,
-    confidence: Math.max(0, Math.min(100, Math.round(score * 3))),
+    confidence: confidence == null ? Math.max(0, Math.min(99, Math.round(score * 2))) : confidence,
     matchReasons,
   };
 }
@@ -1022,6 +1045,7 @@ async function exactTitleCandidate(query) {
   return {
     show,
     score: 100,
+    confidence: 100,
     reasons: [reason],
   };
 }
@@ -1035,7 +1059,7 @@ const TOPIC_TITLE_SEEDS = {
     'Step Into Liquid',
   ],
 };
-async function promptCandidatesV2(query, intent) {
+async function promptCandidatesV2(query, intent, profile = {}) {
   const catalogue = await catalogueShows();
   const pool = new Map(catalogue.map((show) => [show.id, show]));
   const priorityIds = new Set();
@@ -1067,7 +1091,7 @@ async function promptCandidatesV2(query, intent) {
   let mappedDiscoveryCount = 0;
   let discoveredTitles = [];
   try {
-    discoveredTitles = await externalTopicDiscovery(query, intent);
+    discoveredTitles = await externalTopicDiscovery(query, intent, profile);
     discoveredTitleCount = discoveredTitles.length;
     const discoveredShows = await mapDiscoveryTitlesToTvMaze(discoveredTitles);
     mappedDiscoveryCount = discoveredShows.filter(Boolean).length;
@@ -1088,21 +1112,22 @@ async function promptCandidatesV2(query, intent) {
     .map((show) => {
       const scored = scorePromptV2(show, query, {
         ...intent,
-        maxSeasons: null,
-        maxRuntime: null,
+            maxRuntime: null,
         completedOnly: false,
       });
       return { show, score: Number(scored.score || 0) };
     })
     .sort((a, b) => b.score - a.score);
 
+  const excludedIds = new Set((Array.isArray(profile.excludedIds) ? profile.excludedIds : [])
+    .map(Number).filter(Number.isFinite));
   const priorityShows = [...priorityIds]
     .map((id) => pool.get(id))
-    .filter(Boolean);
+    .filter((show) => show && !excludedIds.has(Number(show.id)));
   const prioritySet = new Set(priorityShows.map((show) => show.id));
   const fallbackShows = provisional
     .map((item) => item.show)
-    .filter((show) => !prioritySet.has(show.id));
+    .filter((show) => !prioritySet.has(show.id) && !excludedIds.has(Number(show.id)));
 
   const enrichmentQueue = [...priorityShows, ...fallbackShows].slice(0, 64);
   const enriched = await enrichShowsV2(enrichmentQueue, 64);
@@ -1186,6 +1211,9 @@ app.post('/recommendations', async (request, response) => {
     let candidates;
     let interpretation;
     let mood = null;
+    const profile = request.body?.profile && typeof request.body.profile === 'object'
+      ? request.body.profile
+      : {};
 
     if (mode === 'mood') {
       mood = String(request.body?.mood || '').trim().toLowerCase();
@@ -1205,25 +1233,44 @@ app.post('/recommendations', async (request, response) => {
         candidates = [exact];
       } else {
         const parsed = await enrichReferenceV2(parsePromptV2(query));
+        parsed.preferredGenres = Array.isArray(profile.preferredGenres)
+          ? profile.preferredGenres.map(String).filter(Boolean)
+          : [];
         interpretation = parsed.labels;
-        candidates = await promptCandidatesV2(query, parsed);
+        candidates = await promptCandidatesV2(query, parsed, profile);
       }
     }
 
     const excludedIds = new Set(
-      (Array.isArray(request.body?.profile?.excludedIds) ? request.body.profile.excludedIds : [])
+      (Array.isArray(profile.excludedIds) ? profile.excludedIds : [])
         .map(Number).filter(Number.isFinite),
     );
-    response.json({
-      mode,
-      mood,
-      interpretation,
-      results: candidates
-        .map(({ show, score, reasons }) => toShowItem(show, score, reasons))
-        .filter((item) => item.poster && item.title && !excludedIds.has(Number(item.id)))
-        .sort((a, b) => b.recommendationScore - a.recommendationScore)
-        .slice(0, 10),
-    });
+    let results = candidates
+      .map(({ show, score, reasons, confidence }) => toShowItem(show, score, reasons, confidence))
+      .filter((item) => item.poster && item.title && !excludedIds.has(Number(item.id)))
+      .sort((a, b) => b.recommendationScore - a.recommendationScore);
+
+    const requestedServices = (Array.isArray(profile.services) ? profile.services : [])
+      .map((value) => String(value).trim().toLowerCase())
+      .filter(Boolean);
+    const region = String(profile.region || 'ZA').toUpperCase();
+    if (requestedServices.length && results.length) {
+      const serviceAliases = {
+        'prime video': ['prime video', 'amazon prime', 'amazon prime video'],
+        'hbo max': ['hbo max', 'max'],
+        'apple tv+': ['apple tv+', 'apple tv plus'],
+        'dstv stream': ['dstv stream', 'dstv'],
+      };
+      const wanted = new Set(requestedServices.flatMap((name) => serviceAliases[name] || [name]));
+      const checked = await Promise.all(results.slice(0, 16).map(async (item) => {
+        const availability = await resolveAvailability({ showId: item.id, region });
+        const names = (availability.providers || []).map((provider) => String(provider.name || '').trim().toLowerCase());
+        return names.some((name) => [...wanted].some((target) => name === target || name.includes(target) || target.includes(name))) ? item : null;
+      }));
+      results = checked.filter(Boolean);
+    }
+
+    response.json({ mode, mood, interpretation, results: results.slice(0, 10) });
   } catch (error) {
     console.error(error);
     response.status(502).json({ error: 'Live catalogue lookup failed.' });

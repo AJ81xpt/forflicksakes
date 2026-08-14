@@ -19,9 +19,9 @@ class ApiService {
     required String query,
     required String region,
     required Set<String> services,
-    required int maxSeasons,
     required bool completedOnly,
     required Set<int> excludedIds,
+    Set<String> preferredGenres = const <String>{},
   }) {
     return _recommend(
       <String, dynamic>{
@@ -30,9 +30,9 @@ class ApiService {
         'profile': _profile(
           region,
           services,
-          maxSeasons,
           completedOnly,
           excludedIds,
+          preferredGenres,
         ),
       },
     );
@@ -55,7 +55,6 @@ class ApiService {
       query: 'Something like $title$suffix',
       region: region,
       services: const <String>{},
-      maxSeasons: 10,
       completedOnly: false,
       excludedIds: const <int>{},
     );
@@ -65,9 +64,9 @@ class ApiService {
     required String mood,
     required String region,
     required Set<String> services,
-    required int maxSeasons,
     required bool completedOnly,
     required Set<int> excludedIds,
+    Set<String> preferredGenres = const <String>{},
   }) {
     return _recommend(
       <String, dynamic>{
@@ -76,9 +75,9 @@ class ApiService {
         'profile': _profile(
           region,
           services,
-          maxSeasons,
           completedOnly,
           excludedIds,
+          preferredGenres,
         ),
       },
     );
@@ -87,16 +86,16 @@ class ApiService {
   Map<String, dynamic> _profile(
     String region,
     Set<String> services,
-    int maxSeasons,
     bool completedOnly,
     Set<int> excludedIds,
+    Set<String> preferredGenres,
   ) {
     return <String, dynamic>{
       'region': region,
       'services': services.toList(),
-      'maxSeasons': maxSeasons,
       'completedOnly': completedOnly,
       'excludedIds': excludedIds.toList(),
+      'preferredGenres': preferredGenres.toList(),
     };
   }
 

@@ -17,20 +17,11 @@ const show = (overrides = {}) => ({
 });
 
 test('thriller request rejects ordinary comedy', () => {
-  const intent = parsePrompt('A completed thriller under 3 seasons');
+  const intent = parsePrompt('A completed thriller');
   const comedy = show({ genres: ['Comedy'], summary: '<p>Friends run a cafe and make jokes.</p>' });
   assert.equal(auditPrompt(comedy, intent).passed, false);
 });
 
-test('season limit is a hard filter', () => {
-  const intent = parsePrompt('A thriller under 3 seasons');
-  const thriller = show({
-    genres: ['Thriller'],
-    summary: '<p>A tense conspiracy.</p>',
-    _embedded: { seasons: [{}, {}, {}, {}] },
-  });
-  assert.equal(auditPrompt(thriller, intent).passed, false);
-});
 
 test('completed only rejects running shows', () => {
   const intent = parsePrompt('A completed mystery');
@@ -51,7 +42,7 @@ test('dark mood does not require dark in title', () => {
 });
 
 test('prompt score returns transparent reasons', () => {
-  const intent = parsePrompt('A completed thriller under 3 seasons with twists');
+  const intent = parsePrompt('A completed thriller with twists');
   const candidate = show({ genres: ['Thriller', 'Mystery'], summary: '<p>A suspense conspiracy full of twists.</p>' });
   const result = scorePrompt(candidate, intent.raw, intent);
   assert.equal(result.passed, true);
@@ -90,7 +81,6 @@ test('descriptive requests are not mistaken for exact title searches', () => {
   assert.equal(looksLikeTitleLookup('something dark'), false);
   assert.equal(looksLikeTitleLookup('something like Dark'), false);
   assert.equal(looksLikeTitleLookup('I want a happy show'), false);
-  assert.equal(looksLikeTitleLookup('completed thriller under 3 seasons'), false);
 });
 
 test('title normalization ignores punctuation and case', () => {
@@ -195,4 +185,85 @@ test('TVMaze Documentary type satisfies documentary format even when genres are 
     summary: 'A series about surfing pioneer Garrett McNamara and big-wave surfing in Nazare.',
   });
   assert.equal(scorePrompt(wave, intent.raw, intent).passed, true);
+});
+
+
+test('true crime documentary rejects fictional crime drama', () => {
+  const intent = parsePrompt('true crime documentary');
+  const fiction = show({ type: 'Scripted', genres: ['Crime', 'Drama'], summary: 'A detective investigates a serial killer murder case.' });
+  assert.equal(scorePrompt(fiction, intent.raw, intent).passed, false);
+  const doc = show({ type: 'Documentary', genres: ['Crime'], summary: 'A true crime documentary examining an unsolved murder case.' });
+  assert.equal(scorePrompt(doc, intent.raw, intent).passed, true);
+});
+
+test('preferred genres are a soft ranking boost, not a hard filter', () => {
+  const intent = parsePrompt('something gripping');
+  intent.preferredGenres = ['Documentary'];
+  const doc = show({ type: 'Documentary', genres: ['Documentary'], summary: 'A gripping investigation full of suspense and danger.' });
+  const drama = show({ type: 'Scripted', genres: ['Drama'], summary: 'A gripping investigation full of suspense and danger.' });
+  assert.equal(scorePrompt(drama, intent.raw, intent).passed, true);
+  assert.ok(scorePrompt(doc, intent.raw, intent).score > scorePrompt(drama, intent.raw, intent).score);
+});
+
+test('explicit romantic drama requires real Romance and Drama metadata', () => {
+  const intent = parsePrompt('romantic drama');
+  const falsePositive = show({
+    name: 'Historical Action Story',
+    genres: ['Drama', 'Action', 'History'],
+    summary: 'A warrior has an intense relationship while fighting for survival.',
+  });
+  const realMatch = show({
+    name: 'Actual Romance',
+    genres: ['Drama', 'Romance'],
+    summary: 'Two people fall in love while navigating family expectations.',
+  });
+  assert.equal(scorePrompt(falsePositive, intent.raw, intent).passed, false);
+  assert.equal(scorePrompt(realMatch, intent.raw, intent).passed, true);
+});
+
+test('drug crime action drama requires drug-topic evidence as well as all genres', () => {
+  const intent = parsePrompt('drug crime action drama');
+  assert.ok(intent.topicGroups.includes('drugs'));
+  assert.deepEqual(intent.requiredGenres.sort(), ['Action', 'Crime', 'Drama'].sort());
+
+  const buffyLike = show({
+    name: 'Vampire Slayer',
+    genres: ['Drama', 'Action', 'Supernatural'],
+    summary: 'A teenager fights vampires and demons.',
+  });
+  const genericCrimeAction = show({
+    name: 'City Vigilante',
+    genres: ['Drama', 'Action', 'Crime'],
+    summary: 'A masked vigilante fights organized crime across the city.',
+  });
+  const drugCrime = show({
+    name: 'Cartel City',
+    genres: ['Drama', 'Action', 'Crime'],
+    summary: 'Detectives battle a cocaine cartel and a violent drug trafficking network.',
+  });
+
+  assert.equal(scorePrompt(buffyLike, intent.raw, intent).passed, false);
+  assert.equal(scorePrompt(genericCrimeAction, intent.raw, intent).passed, false);
+  assert.equal(scorePrompt(drugCrime, intent.raw, intent).passed, true);
+});
+
+test('compound prompt confidence is meaningful rather than automatically 100', () => {
+  const intent = parsePrompt('drug crime action drama');
+  const candidate = show({
+    name: 'Cartel City',
+    genres: ['Drama', 'Action', 'Crime'],
+    summary: 'Detectives battle a cocaine cartel and a violent drug trafficking network.',
+    rating: { average: 8.2 },
+  });
+  const result = scorePrompt(candidate, intent.raw, intent);
+  assert.equal(result.passed, true);
+  assert.ok(result.confidence >= 90 && result.confidence < 100);
+});
+
+
+test('season count is not treated as a recommendation constraint', () => {
+  const intent = parsePrompt('a thriller under 3 seasons');
+  assert.equal('maxSeasons' in intent, false);
+  const longRunner = show({ genres: ['Thriller'], _embedded: { seasons: [{}, {}, {}, {}, {}, {}] }, summary: 'A tense conspiracy.' });
+  assert.equal(scorePrompt(longRunner, intent.raw, intent).passed, true);
 });

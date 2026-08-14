@@ -7,52 +7,48 @@ class PersonalizationSnapshot {
   const PersonalizationSnapshot({
     required this.region,
     required this.services,
-    required this.maxSeasons,
+    required this.preferredGenres,
     required this.completedOnly,
     required this.savedIds,
     required this.dismissedIds,
     required this.watchedIds,
     required this.feedbackCounts,
     required this.knownShows,
-    required this.appLanguage,
   });
 
   final String region;
   final Set<String> services;
-  final int maxSeasons;
+  final Set<String> preferredGenres;
   final bool completedOnly;
   final Set<int> savedIds;
   final Set<int> dismissedIds;
   final Set<int> watchedIds;
   final Map<String, int> feedbackCounts;
   final Map<int, ShowItem> knownShows;
-  final String appLanguage;
 
   factory PersonalizationSnapshot.defaults() => const PersonalizationSnapshot(
         region: 'ZA',
         services: {'Netflix', 'Prime Video', 'HBO Max', 'Showmax'},
-        maxSeasons: 99,
+        preferredGenres: <String>{},
         completedOnly: false,
         savedIds: <int>{},
         dismissedIds: <int>{},
         watchedIds: <int>{},
         feedbackCounts: <String, int>{},
         knownShows: <int, ShowItem>{},
-        appLanguage: 'en',
       );
 }
 
 class PersonalizationStore {
   static const _regionKey = 'ffs_region';
   static const _servicesKey = 'ffs_services';
-  static const _maxSeasonsKey = 'ffs_max_seasons';
+  static const _preferredGenresKey = 'ffs_preferred_genres';
   static const _completedOnlyKey = 'ffs_completed_only';
   static const _savedIdsKey = 'ffs_saved_ids';
   static const _dismissedIdsKey = 'ffs_dismissed_ids';
   static const _watchedIdsKey = 'ffs_watched_ids';
   static const _feedbackKey = 'ffs_feedback_counts';
   static const _knownShowsKey = 'ffs_known_shows';
-  static const _appLanguageKey = 'ffs_app_language';
 
   Future<PersonalizationSnapshot> load() async {
     final prefs = await SharedPreferences.getInstance();
@@ -60,14 +56,13 @@ class PersonalizationStore {
     return PersonalizationSnapshot(
       region: prefs.getString(_regionKey) ?? defaults.region,
       services: _normalizeServices((prefs.getStringList(_servicesKey) ?? defaults.services.toList()).toSet()),
-      maxSeasons: prefs.getInt(_maxSeasonsKey) ?? defaults.maxSeasons,
+      preferredGenres: (prefs.getStringList(_preferredGenresKey) ?? const <String>[]).toSet(),
       completedOnly: prefs.getBool(_completedOnlyKey) ?? defaults.completedOnly,
       savedIds: _decodeIds(prefs.getStringList(_savedIdsKey)),
       dismissedIds: _decodeIds(prefs.getStringList(_dismissedIdsKey)),
       watchedIds: _decodeIds(prefs.getStringList(_watchedIdsKey)),
       feedbackCounts: _decodeFeedback(prefs.getString(_feedbackKey)),
       knownShows: _decodeShows(prefs.getString(_knownShowsKey)),
-      appLanguage: prefs.getString(_appLanguageKey) ?? defaults.appLanguage,
     );
   }
 
@@ -83,14 +78,14 @@ class PersonalizationStore {
   Future<void> savePreferences({
     required String region,
     required Set<String> services,
-    required int maxSeasons,
+    required Set<String> preferredGenres,
     required bool completedOnly,
   }) async {
     final prefs = await SharedPreferences.getInstance();
     await Future.wait([
       prefs.setString(_regionKey, region),
       prefs.setStringList(_servicesKey, _normalizeServices(services).toList()..sort()),
-      prefs.setInt(_maxSeasonsKey, maxSeasons),
+      prefs.setStringList(_preferredGenresKey, preferredGenres.toList()..sort()),
       prefs.setBool(_completedOnlyKey, completedOnly),
     ]);
   }
@@ -141,24 +136,19 @@ class PersonalizationStore {
     await prefs.setStringList(_dismissedIdsKey, dismissed.map((id) => '$id').toList());
   }
 
-  Future<void> saveAppLanguage(String languageCode) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_appLanguageKey, languageCode);
-  }
 
   Future<void> reset() async {
     final prefs = await SharedPreferences.getInstance();
     for (final key in <String>[
       _regionKey,
       _servicesKey,
-      _maxSeasonsKey,
+      _preferredGenresKey,
       _completedOnlyKey,
       _savedIdsKey,
       _dismissedIdsKey,
       _watchedIdsKey,
       _feedbackKey,
       _knownShowsKey,
-      _appLanguageKey,
     ]) {
       await prefs.remove(key);
     }

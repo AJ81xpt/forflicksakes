@@ -72,9 +72,36 @@ const TOPIC_FAMILIES = {
     evidence: /\b(?:archaeolog|archeolog|excavation|ancient ruins|artifact|artefact)\w*/i,
     searchTerms: ['archaeology', 'ancient ruins'],
   },
+  drugs: {
+    aliases: ['drug', 'drugs', 'drug trade', 'drug trafficking', 'narcotics', 'cartel', 'cartels', 'cocaine', 'heroin', 'meth', 'dealer', 'dealers'],
+    evidence: /\b(?:drug(?:s| trade| trafficking)?|narcotics?|cartels?|cocaine|heroin|meth(?:amphetamine)?|dealer(?:s)?|traffick(?:ing|er|ers)|narco(?:s)?)\b/i,
+    strongEvidence: /\b(?:drug trade|drug trafficking|narcotics?|cartels?|cocaine|heroin|meth(?:amphetamine)?|dealer(?:s)?|traffick(?:ing|er|ers)|narco(?:s)?)\b/i,
+    searchTerms: ['drug trafficking', 'drug cartel', 'narcotics', 'cocaine'],
+  },
+  mafia: {
+    aliases: ['mafia', 'mob', 'gangster', 'gangsters', 'organized crime', 'organised crime'],
+    evidence: /\b(?:mafia|mobster(?:s)?|gangster(?:s)?|organized crime|organised crime|crime family)\b/i,
+    searchTerms: ['mafia', 'organized crime', 'gangster'],
+  },
+  legal: {
+    aliases: ['legal', 'lawyer', 'lawyers', 'courtroom', 'court', 'attorney', 'attorneys'],
+    evidence: /\b(?:lawyer(?:s)?|attorney(?:s)?|courtroom|court case|legal case|law firm|prosecutor(?:s)?|defen[cs]e attorney)\b/i,
+    searchTerms: ['courtroom', 'lawyer', 'legal drama'],
+  },
+  espionage: {
+    aliases: ['spy', 'spies', 'espionage', 'intelligence agency', 'secret agent'],
+    evidence: /\b(?:spy|spies|espionage|intelligence agency|secret agent|cia|mi6|counterintelligence)\b/i,
+    searchTerms: ['espionage', 'spy', 'secret agent'],
+  },
+  supernatural: {
+    aliases: ['supernatural', 'vampire', 'vampires', 'witch', 'witches', 'werewolf', 'werewolves', 'ghost', 'ghosts'],
+    evidence: /\b(?:supernatural|vampire(?:s)?|witch(?:es)?|werewolv(?:es|e)|ghost(?:s)?|demon(?:s)?)\b/i,
+    searchTerms: ['supernatural', 'vampire', 'witch'],
+  },
   'true crime': {
     aliases: ['true crime', 'real crime'],
     evidence: /\b(?:true crime|real[- ]life crime|murder case|criminal case|serial killer|unsolved crime)\b/i,
+    strongEvidence: /\b(?:true crime|real[- ]life crime|real crime|actual crime|real[- ]world crime|documentary investigation|unsolved crime)\b/i,
     searchTerms: ['true crime', 'unsolved crime'],
   },
   food: {
@@ -222,14 +249,12 @@ export function parsePrompt(query) {
     if (pattern.test(raw)) for (const genre of genres) if (!excludedGenres.has(genre)) requiredGenres.add(genre);
   }
 
-  const seasonMatch = lower.match(/(?:no more than|up to|max(?:imum)?|under|less than)\s+(\d+)\s+seasons?/i);
   const runtimeMatch = lower.match(/(?:no more than|up to|max(?:imum)?|under|less than)\s+(\d+)\s*(?:minutes?|mins?)/i);
   const referenceMatch = raw.match(/\b(?:like|similar to)\s+([^,.!?]+?)(?:\s+but\b|\s+without\b|\s+with\b|\s+and\b|$)/i);
   const topicGroups = detectedTopics(raw);
 
   const intent = {
     raw,
-    maxSeasons: seasonMatch ? Number(seasonMatch[1]) : null,
     maxRuntime: runtimeMatch ? Number(runtimeMatch[1]) : (/\b(?:half[- ]hour|short episodes?|quick watch)\b/i.test(raw) ? 35 : null),
     completedOnly: /\b(?:completed|finished|ended|complete story|no cliffhanger|finished airing)\b/i.test(raw),
     requiredGenres: [...requiredGenres], excludedGenres: [...excludedGenres], themes, exclusions,
@@ -249,7 +274,6 @@ export function parsePrompt(query) {
   if (intent.requiredGenres.length) labels.push(`Required: ${intent.requiredGenres.join(' / ')}`);
   if (intent.topicGroups.length) labels.push(`Topic: ${intent.topicGroups.join(' / ')}`);
   if (intent.excludedGenres.length) labels.push(`Exclude: ${intent.excludedGenres.join(' / ')}`);
-  if (intent.maxSeasons) labels.push(`Maximum ${intent.maxSeasons} seasons`);
   if (intent.maxRuntime) labels.push(`Episodes up to ${intent.maxRuntime} min`);
   if (intent.completedOnly) labels.push('Finished series');
   if (intent.referenceTitle) labels.push(`Similar to ${intent.referenceTitle}`);
@@ -281,12 +305,21 @@ export function showProfile(show) {
   };
 }
 
-function genreMatches(profile, genre) {
-  const target = genre.toLowerCase();
-  if (profile.genres.some((g) => g.toLowerCase() === target)) return true;
-  // Documentary is a format/genre constraint. A fictional show merely mentioning
-  // a documentary in its synopsis must never qualify as a documentary.
+function strictGenreMatches(profile, genre) {
+  const target = String(genre || '').toLowerCase();
+  if (profile.genres.some((g) => String(g).toLowerCase() === target)) return true;
+  // TVMaze often represents factual series as type=Documentary while genres are
+  // topical (Sports, Crime, History, etc.). Treat that as authoritative format evidence.
   if (genre === 'Documentary') return profile.type.toLowerCase() === 'documentary';
+  return false;
+}
+
+function genreMatches(profile, genre) {
+  if (strictGenreMatches(profile, genre)) return true;
+  // Semantic genre inference is deliberately reserved for soft ranking signals
+  // (moods, taste, reference similarity). Explicit user-requested genres use
+  // strictGenreMatches so a synopsis word cannot turn Buffy into Crime or
+  // Spartacus into Romance.
   const semantic = {
     Thriller: /suspense|conspiracy|espionage|hostage|danger|psychological|serial killer|race against time/,
     Mystery: /mystery|detective|investigation|missing|puzzle|whodunnit|twist/,
@@ -318,18 +351,18 @@ function topicMatches(profile, key, documentaryRequired = false) {
 
 export function auditPrompt(show, intent) {
   const profile = showProfile(show);
-  const requiredMatches = intent.requiredGenres.filter((genre) => genreMatches(profile, genre));
-  const requiredMisses = intent.requiredGenres.filter((genre) => !genreMatches(profile, genre));
-  const excludedMatches = intent.excludedGenres.filter((genre) => genreMatches(profile, genre));
+  const requiredMatches = intent.requiredGenres.filter((genre) => strictGenreMatches(profile, genre));
+  const requiredMisses = intent.requiredGenres.filter((genre) => !strictGenreMatches(profile, genre));
+  const excludedMatches = intent.excludedGenres.filter((genre) => strictGenreMatches(profile, genre));
   const topicGroups = Array.isArray(intent.topicGroups) ? intent.topicGroups : [];
-  const topicHits = topicGroups.filter((key) => topicMatches(profile, key));
-  const topicMisses = topicGroups.filter((key) => !topicMatches(profile, key));
+  const documentaryRequired = intent.requiredGenres.includes('Documentary');
+  const topicHits = topicGroups.filter((key) => topicMatches(profile, key, documentaryRequired));
+  const topicMisses = topicGroups.filter((key) => !topicMatches(profile, key, documentaryRequired));
   const violations = [];
 
   if (requiredMisses.length) violations.push(`Missing ${requiredMisses.join(' / ')}`);
   if (topicMisses.length) violations.push(`Missing topic ${topicMisses.join(' / ')}`);
   if (excludedMatches.length) violations.push(`Contains excluded ${excludedMatches.join(' / ')}`);
-  if (intent.maxSeasons && (!profile.seasons || profile.seasons > intent.maxSeasons)) violations.push('Season limit');
   if (intent.maxRuntime && (!profile.runtime || profile.runtime > intent.maxRuntime)) violations.push('Runtime limit');
   if (intent.completedOnly && profile.status !== 'Ended') violations.push('Not finished');
   if (intent.exclusions.includes('dark') && profile.attributes.darkness >= 4) violations.push('Too dark');
@@ -354,17 +387,42 @@ function themeScore(profile, themes) {
   return score;
 }
 
+function promptConfidence(intent, audit, profile) {
+  const hardCount = (intent.requiredGenres?.length || 0)
+    + (intent.topicGroups?.length || 0)
+    + (intent.maxRuntime ? 1 : 0)
+    + (intent.completedOnly ? 1 : 0)
+    + (intent.excludedGenres?.length || 0)
+    + (intent.exclusions?.length || 0);
+  const satisfiedHard = (audit.requiredMatches?.length || 0)
+    + (audit.topicHits?.length || 0)
+    + (intent.maxRuntime && profile.runtime && profile.runtime <= intent.maxRuntime ? 1 : 0)
+    + (intent.completedOnly && profile.status === 'Ended' ? 1 : 0)
+    + (intent.excludedGenres?.length || 0)
+    + (intent.exclusions?.length || 0);
+
+  // Hard requirements dominate confidence. Rating/popularity only fine-tune it.
+  let confidence = hardCount
+    ? 72 + Math.round((satisfiedHard / hardCount) * 20)
+    : 58;
+  if ((intent.themes || []).length) confidence += Math.min(5, Math.round(themeScore(profile, intent.themes) / 5));
+  if (profile.rating >= 8) confidence += 3;
+  else if (profile.rating >= 7) confidence += 2;
+  if ((intent.preferredGenres || []).some((genre) => strictGenreMatches(profile, genre))) confidence += 2;
+  return Math.max(1, Math.min(99, confidence));
+}
+
 export function scorePrompt(show, query, intent) {
   const audit = auditPrompt(show, intent);
-  if (!audit.passed) return { passed: false, score: -999, reasons: [], audit };
+  if (!audit.passed) return { passed: false, score: -999, confidence: 0, reasons: [], audit };
   const p = audit.profile;
   let score = audit.requiredMatches.length * 30 + audit.topicHits.length * 35;
   score += themeScore(p, intent.themes);
   score += Math.min(p.rating, 10) * 1.2 + p.popularity / 80;
   if (intent.completedOnly) score += 8;
-  if (intent.maxSeasons && p.seasons <= intent.maxSeasons) score += 5;
   if (intent.maxRuntime && p.runtime <= intent.maxRuntime) score += 5;
   for (const genre of intent.referenceGenres || []) if (genreMatches(p, genre)) score += 6;
+  for (const genre of intent.preferredGenres || []) if (genreMatches(p, genre)) score += 7;
   if (intent.referenceProfile?.attributes) {
     const reference = intent.referenceProfile.attributes;
     const current = p.attributes;
@@ -378,15 +436,16 @@ export function scorePrompt(show, query, intent) {
   if (audit.requiredMatches.length) reasons.push(`Required match: ${audit.requiredMatches.join(' / ')}`);
   if (audit.topicHits.length) reasons.push(`Topic match: ${audit.topicHits.join(' / ')}`);
   if (intent.completedOnly) reasons.push('Finished series');
-  if (intent.maxSeasons) reasons.push(`${p.seasons} seasons — within your limit`);
   if (intent.maxRuntime) reasons.push(`${p.runtime}-minute episodes — within your limit`);
   if (intent.referenceGenres?.length) reasons.push(`Shares genres with ${intent.referenceName || intent.referenceTitle}`);
+  const preferredHits = (intent.preferredGenres || []).filter((genre) => genreMatches(p, genre));
+  if (preferredHits.length) reasons.push(`Matches your taste: ${preferredHits.slice(0, 2).join(' / ')}`);
   if (intent.referenceProfile?.attributes) reasons.push(`Similar tone and intensity to ${intent.referenceName || intent.referenceTitle}`);
   if (intent.themes.includes('twisty') && p.attributes.complexity >= 3) reasons.push('Twisty, puzzle-led storytelling');
   if (intent.themes.includes('light') && p.attributes.comfort >= 3) reasons.push('Lighter, more comforting tone');
   if (intent.themes.includes('feelGood') && p.attributes.comfort >= 2) reasons.push('Warm, upbeat feel-good tone');
   if (p.rating) reasons.push(`Rated ${p.rating}/10`);
-  return { passed: true, score, reasons: reasons.slice(0, 5), audit };
+  return { passed: true, score, confidence: promptConfidence(intent, audit, p), reasons: reasons.slice(0, 5), audit };
 }
 
 export function scoreMood(show, mood) {

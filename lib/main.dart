@@ -9,14 +9,6 @@ import 'services/api_service.dart';
 import 'services/personalization_store.dart';
 
 
-const _ffsLanguages = <String, String>{
-  'en': 'English',
-  'pt': 'Português',
-  'es': 'Español',
-  'fr': 'Français',
-  'de': 'Deutsch',
-};
-
 const _ffsText = <String, Map<String, String>>{
   'en': {
     'discover': 'Discover',
@@ -32,7 +24,6 @@ const _ffsText = <String, Map<String, String>>{
     'profileTitle': 'Profile & taste',
     'streamingRegion': 'Streaming region',
     'streamingServices': 'Streaming services',
-    'language': 'App language',
     'stored': 'Stored on this device',
     'storedBody': 'Your preferences, watch history and watchlist stay on this device.',
     'reset': 'Reset personalisation',
@@ -180,9 +171,8 @@ class _AppShellState extends State<AppShell> {
   bool _loadingProfile = true;
   String _region = 'ZA';
   Set<String> _services = <String>{'Netflix', 'Prime Video', 'HBO Max', 'Showmax'};
-  int _maxSeasons = 99;
+  Set<String> _preferredGenres = <String>{};
   bool _completedOnly = false;
-  String _appLanguage = 'en';
   Set<int> _saved = <int>{};
   Set<int> _dismissed = <int>{};
   Set<int> _watched = <int>{};
@@ -201,14 +191,13 @@ class _AppShellState extends State<AppShell> {
     setState(() {
       _region = snapshot.region;
       _services = snapshot.services;
-      _maxSeasons = 99; // No global season cap; prompt-specific limits still work.
+      _preferredGenres = snapshot.preferredGenres;
       _completedOnly = snapshot.completedOnly;
       _saved = snapshot.savedIds;
       _dismissed = snapshot.dismissedIds;
       _watched = snapshot.watchedIds;
       _feedbackCounts = snapshot.feedbackCounts;
       _knownShows = snapshot.knownShows;
-      _appLanguage = snapshot.appLanguage;
       _loadingProfile = false;
     });
   }
@@ -216,7 +205,7 @@ class _AppShellState extends State<AppShell> {
   Future<void> _persistPreferences() => _personalization.savePreferences(
         region: _region,
         services: _services,
-        maxSeasons: _maxSeasons,
+        preferredGenres: _preferredGenres,
         completedOnly: _completedOnly,
       );
 
@@ -251,11 +240,11 @@ class _AppShellState extends State<AppShell> {
   Widget build(BuildContext context) {
     final pages = <Widget>[
       DiscoverPage(
-        languageCode: _appLanguage,
+        languageCode: 'en',
         saved: _saved,
         region: _region,
         services: _services,
-        maxSeasons: _maxSeasons,
+        preferredGenres: _preferredGenres,
         completedOnly: _completedOnly,
         excludedIds: {..._dismissed, ..._watched},
         onToggleSaved: _toggleSaved,
@@ -263,21 +252,20 @@ class _AppShellState extends State<AppShell> {
         onShowsSeen: _rememberShows,
       ),
       ForYouPage(
-        languageCode: _appLanguage,
+        languageCode: 'en',
         saved: _saved,
         watched: _watched,
         dismissed: _dismissed,
         knownShows: _knownShows,
         region: _region,
         services: _services,
-        maxSeasons: _maxSeasons,
         completedOnly: _completedOnly,
         onToggleSaved: _toggleSaved,
         onFeedback: _recordLocalFeedback,
         onShowsSeen: _rememberShows,
       ),
       WatchlistPage(
-        languageCode: _appLanguage,
+        languageCode: 'en',
         saved: _saved,
         knownShows: _knownShows,
         region: _region,
@@ -285,14 +273,10 @@ class _AppShellState extends State<AppShell> {
         onFeedback: _recordLocalFeedback,
       ),
       ProfilePage(
-        languageCode: _appLanguage,
-        onLanguageChanged: (value) {
-          setState(() => _appLanguage = value);
-          _personalization.saveAppLanguage(value);
-        },
+        languageCode: 'en',
         region: _region,
         services: _services,
-        maxSeasons: _maxSeasons,
+        preferredGenres: _preferredGenres,
         completedOnly: _completedOnly,
         watchedCount: _watched.length,
         dismissedCount: _dismissed.length,
@@ -307,8 +291,8 @@ class _AppShellState extends State<AppShell> {
           setState(() => _services = value);
           _persistPreferences();
         },
-        onMaxSeasonsChanged: (value) {
-          setState(() => _maxSeasons = value);
+        onPreferredGenresChanged: (value) {
+          setState(() => _preferredGenres = value);
           _persistPreferences();
         },
         onCompletedOnlyChanged: (value) {
@@ -346,22 +330,22 @@ class _AppShellState extends State<AppShell> {
               NavigationDestination(
                 icon: Icon(Icons.auto_awesome_outlined),
                 selectedIcon: Icon(Icons.auto_awesome_rounded),
-                label: _t(_appLanguage, 'discover'),
+                label: _t('en', 'discover'),
               ),
               NavigationDestination(
                 icon: Icon(Icons.favorite_outline_rounded),
                 selectedIcon: Icon(Icons.favorite_rounded),
-                label: _t(_appLanguage, 'forYou'),
+                label: _t('en', 'forYou'),
               ),
               NavigationDestination(
                 icon: Icon(Icons.bookmark_border_rounded),
                 selectedIcon: Icon(Icons.bookmark_rounded),
-                label: _t(_appLanguage, 'watchlist'),
+                label: _t('en', 'watchlist'),
               ),
               NavigationDestination(
                 icon: Icon(Icons.person_outline_rounded),
                 selectedIcon: Icon(Icons.person_rounded),
-                label: _t(_appLanguage, 'profile'),
+                label: _t('en', 'profile'),
               ),
             ],
           ),
@@ -377,7 +361,7 @@ class DiscoverPage extends StatefulWidget {
     required this.saved,
     required this.region,
     required this.services,
-    required this.maxSeasons,
+    required this.preferredGenres,
     required this.completedOnly,
     required this.excludedIds,
     required this.onToggleSaved,
@@ -390,7 +374,7 @@ class DiscoverPage extends StatefulWidget {
   final Set<int> saved;
   final String region;
   final Set<String> services;
-  final int maxSeasons;
+  final Set<String> preferredGenres;
   final bool completedOnly;
   final Set<int> excludedIds;
   final ValueChanged<int> onToggleSaved;
@@ -413,6 +397,7 @@ class _DiscoverPageState extends State<DiscoverPage> {
   List<String> _interpretation = const <String>[];
   String _lastQuery = '';
   int _visibleResultCount = 5;
+  final Set<int> _rejectedResultIds = <int>{};
 
 
   static const moods = <_MoodOption>[
@@ -471,9 +456,9 @@ class _DiscoverPageState extends State<DiscoverPage> {
         query: query,
         region: widget.region,
         services: widget.services,
-        maxSeasons: widget.maxSeasons,
         completedOnly: widget.completedOnly,
-        excludedIds: widget.excludedIds,
+        excludedIds: {...widget.excludedIds, ..._rejectedResultIds},
+        preferredGenres: widget.preferredGenres,
       );
       await widget.onShowsSeen(recommendation.shows);
       if (!mounted) return;
@@ -512,9 +497,9 @@ class _DiscoverPageState extends State<DiscoverPage> {
         mood: mood.keyName,
         region: widget.region,
         services: widget.services,
-        maxSeasons: widget.maxSeasons,
         completedOnly: widget.completedOnly,
-        excludedIds: widget.excludedIds,
+        excludedIds: {...widget.excludedIds, ..._rejectedResultIds},
+        preferredGenres: widget.preferredGenres,
       );
       await widget.onShowsSeen(recommendation.shows);
       if (!mounted) return;
@@ -667,9 +652,16 @@ class _DiscoverPageState extends State<DiscoverPage> {
         resultIds: _results.map((show) => show.id).toList(),
       );
       if (!mounted) return;
+      _rejectedResultIds.addAll(_results.map((show) => show.id));
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Thanks — feedback saved.')),
+        const SnackBar(content: Text('Got it — finding a different set…')),
       );
+      if (_resultMode == 'prompt') {
+        await _findFromPrompt();
+      } else {
+        final matches = moods.where((item) => item.title == _activeMood).toList();
+        if (matches.isNotEmpty) await _browseMood(matches.first);
+      }
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -714,7 +706,7 @@ class _DiscoverPageState extends State<DiscoverPage> {
                       padding: EdgeInsets.only(left: 15, right: 8, bottom: 48),
                       child: Icon(Icons.chat_bubble_outline_rounded, size: 27),
                     ),
-                    hintText: 'A psychological thriller that has finished airing, under 3 seasons, with clever twists',
+                    hintText: 'A psychological thriller that has finished airing, with clever twists',
                     filled: true,
                     fillColor: const Color(0xFF15111D),
                     contentPadding: const EdgeInsets.symmetric(
@@ -1883,7 +1875,6 @@ class ForYouPage extends StatefulWidget {
     required this.knownShows,
     required this.region,
     required this.services,
-    required this.maxSeasons,
     required this.completedOnly,
     required this.onToggleSaved,
     required this.onFeedback,
@@ -1898,7 +1889,6 @@ class ForYouPage extends StatefulWidget {
   final Map<int, ShowItem> knownShows;
   final String region;
   final Set<String> services;
-  final int maxSeasons;
   final bool completedOnly;
   final ValueChanged<int> onToggleSaved;
   final Future<void> Function(int showId, String reason) onFeedback;
@@ -1919,7 +1909,7 @@ class _ForYouPageState extends State<ForYouPage> {
     final saved = widget.saved.toList()..sort();
     final watched = widget.watched.toList()..sort();
     final dismissed = widget.dismissed.toList()..sort();
-    return '${saved.join(',')}|${watched.join(',')}|${dismissed.join(',')}|${widget.region}|${widget.maxSeasons}|${widget.completedOnly}';
+    return '${saved.join(',')}|${watched.join(',')}|${dismissed.join(',')}|${widget.region}|${widget.completedOnly}';
   }
 
   @override
@@ -1946,7 +1936,6 @@ class _ForYouPageState extends State<ForYouPage> {
       query: query,
       region: widget.region,
       services: widget.services,
-      maxSeasons: widget.maxSeasons,
       completedOnly: widget.completedOnly,
       excludedIds: excluded,
     );
@@ -2275,10 +2264,9 @@ class WatchlistPage extends StatelessWidget {
 class ProfilePage extends StatelessWidget {
   const ProfilePage({
     required this.languageCode,
-    required this.onLanguageChanged,
     required this.region,
     required this.services,
-    required this.maxSeasons,
+    required this.preferredGenres,
     required this.completedOnly,
     required this.watchedCount,
     required this.dismissedCount,
@@ -2287,7 +2275,7 @@ class ProfilePage extends StatelessWidget {
     required this.feedbackCounts,
     required this.onRegionChanged,
     required this.onServicesChanged,
-    required this.onMaxSeasonsChanged,
+    required this.onPreferredGenresChanged,
     required this.onCompletedOnlyChanged,
     required this.onRestoreDismissed,
     required this.onReset,
@@ -2295,10 +2283,9 @@ class ProfilePage extends StatelessWidget {
   });
 
   final String languageCode;
-  final ValueChanged<String> onLanguageChanged;
   final String region;
   final Set<String> services;
-  final int maxSeasons;
+  final Set<String> preferredGenres;
   final bool completedOnly;
   final int watchedCount;
   final int dismissedCount;
@@ -2307,7 +2294,7 @@ class ProfilePage extends StatelessWidget {
   final Map<String, int> feedbackCounts;
   final ValueChanged<String> onRegionChanged;
   final ValueChanged<Set<String>> onServicesChanged;
-  final ValueChanged<int> onMaxSeasonsChanged;
+  final ValueChanged<Set<String>> onPreferredGenresChanged;
   final ValueChanged<bool> onCompletedOnlyChanged;
   final Future<void> Function(int id) onRestoreDismissed;
   final Future<void> Function() onReset;
@@ -2349,24 +2336,25 @@ class ProfilePage extends StatelessWidget {
             ),
           ],
           const SizedBox(height: 30),
-          Text(_t(languageCode, 'language'), style: Theme.of(context).textTheme.titleLarge),
-          const SizedBox(height: 12),
-          DropdownButtonFormField<String>(
-            value: languageCode,
-            decoration: const InputDecoration(
-              filled: true,
-              fillColor: Color(0xFF15111D),
-              prefixIcon: Icon(Icons.translate_rounded),
-            ),
-            items: _ffsLanguages.entries
-                .map((entry) => DropdownMenuItem<String>(
-                      value: entry.key,
-                      child: Text(entry.value),
-                    ))
-                .toList(),
-            onChanged: (value) {
-              if (value != null) onLanguageChanged(value);
-            },
+          Text('Favourite genres', style: Theme.of(context).textTheme.titleLarge),
+          const SizedBox(height: 8),
+          const Text('Optional — these gently steer recommendations without blocking other great matches.'),
+          const SizedBox(height: 14),
+          Wrap(
+            spacing: 10,
+            runSpacing: 12,
+            children: const <String>['Documentary', 'Crime', 'Thriller', 'Mystery', 'Comedy', 'Drama', 'Action', 'Science-Fiction', 'Horror', 'Romance', 'Fantasy'].map((genre) {
+              final selected = preferredGenres.contains(genre);
+              return FilterChip(
+                selected: selected,
+                label: Text(genre),
+                onSelected: (_) {
+                  final updated = {...preferredGenres};
+                  if (!updated.add(genre)) updated.remove(genre);
+                  onPreferredGenresChanged(updated);
+                },
+              );
+            }).toList(),
           ),
           const SizedBox(height: 30),
           Text(_t(languageCode, 'streamingRegion'), style: Theme.of(context).textTheme.titleLarge),
