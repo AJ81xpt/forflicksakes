@@ -10,7 +10,7 @@ class ApiService {
 
   static const String _baseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'http://10.0.2.2:8080',
+    defaultValue: 'https://forflicksakes.onrender.com',
   );
 
   final http.Client _client;
