@@ -463,8 +463,14 @@ function discoveryKeywords(query, intent) {
   for (const topic of intent.topicGroups || []) add(topic);
   for (const term of intent.searchTerms || []) add(term);
 
-  // For a descriptive request with no detected topic, keep a cleaned keyword
-  // query as a last resort. Do not use this for bare genre-only requests.
+  // A bare documentary request needs an active retrieval seed. Documentary
+  // is a TVMaze show type, not a reliable Streaming Availability genre id.
+  if (!(intent.topicGroups || []).length && intent.requiredGenres?.includes('Documentary')) {
+    add('documentary');
+  }
+
+  // For a descriptive request with no detected topic or genre, keep a cleaned
+  // keyword query as a last resort.
   if (!(intent.topicGroups || []).length && !(intent.requiredGenres || []).length) {
     add(queryTokens(query).slice(0, 5).join(' '));
   }
@@ -474,7 +480,7 @@ function discoveryKeywords(query, intent) {
 async function externalTopicDiscovery(query, intent) {
   if (!streamingAvailabilityKey) return [];
   const keywords = discoveryKeywords(query, intent);
-  const genreIds = intent.requiredGenres?.includes('Documentary') ? ['documentary'] : [];
+  const genreIds = []; // Documentary is treated as a format/type after retrieval, not as a provider genre filter.
   if (!keywords.length && !genreIds.length) return [];
 
   const cacheKey = JSON.stringify({ keywords, genreIds, countries: DISCOVERY_COUNTRIES });

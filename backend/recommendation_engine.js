@@ -256,6 +256,7 @@ export function parsePrompt(query) {
 
 export function showProfile(show) {
   const genres = Array.isArray(show?.genres) ? show.genres : [];
+  const type = String(show?.type || '');
   const summary = stripHtml(show?.summary || '').toLowerCase();
   const title = String(show?.name || '').toLowerCase();
   const text = `${title} ${summary} ${genres.join(' ').toLowerCase()}`;
@@ -263,7 +264,7 @@ export function showProfile(show) {
   const runtime = Number(show?.averageRuntime || show?.runtime || 0);
   const scoreWords = (words) => words.reduce((score, word) => score + (text.includes(word) ? 1 : 0), 0);
   return {
-    genres, summary, title, text, seasons, runtime, status: String(show?.status || ''), rating: Number(show?.rating?.average || 0), popularity: Math.min(Number(show?.weight || 0), 100),
+    genres, type, summary, title, text, seasons, runtime, status: String(show?.status || ''), rating: Number(show?.rating?.average || 0), popularity: Math.min(Number(show?.weight || 0), 100),
     attributes: {
       humour: Math.min(5, (genres.includes('Comedy') ? 3 : 0) + scoreWords(['funny', 'witty', 'satire', 'sitcom', 'comic'])),
       darkness: Math.min(5, (genres.some((g) => ['Horror', 'Thriller', 'Crime'].includes(g)) ? 2 : 0) + scoreWords(['bleak', 'grim', 'disturbing', 'psychological', 'dystopian', 'murder'])),
@@ -280,7 +281,7 @@ function genreMatches(profile, genre) {
   if (profile.genres.some((g) => g.toLowerCase() === target)) return true;
   // Documentary is a format/genre constraint. A fictional show merely mentioning
   // a documentary in its synopsis must never qualify as a documentary.
-  if (genre === 'Documentary') return false;
+  if (genre === 'Documentary') return profile.type.toLowerCase() === 'documentary';
   const semantic = {
     Thriller: /suspense|conspiracy|espionage|hostage|danger|psychological|serial killer|race against time/,
     Mystery: /mystery|detective|investigation|missing|puzzle|whodunnit|twist/,

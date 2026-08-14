@@ -184,3 +184,15 @@ test('topic families accept genuinely related titles', () => {
 test('100ft title normalization matches 100 Foot spelling', () => {
   assert.equal(normalizeTitle('100ft Wave'), normalizeTitle('100 Foot Wave'));
 });
+
+
+test('TVMaze Documentary type satisfies documentary format even when genres are Sports', () => {
+  const intent = parsePrompt('surfing documentary');
+  const wave = show({
+    name: '100 Foot Wave',
+    type: 'Documentary',
+    genres: ['Sports'],
+    summary: 'A series about surfing pioneer Garrett McNamara and big-wave surfing in Nazare.',
+  });
+  assert.equal(scorePrompt(wave, intent.raw, intent).passed, true);
+});
