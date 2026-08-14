@@ -20,21 +20,25 @@ const TOPIC_FAMILIES = {
   surfing: {
     aliases: ['surfing', 'surf', 'surfer', 'surfers', 'big wave', 'big-wave'],
     evidence: /\b(?:surf(?:ing|er|ers)?|big[- ]wave|wave riding)\b/i,
+    strongEvidence: /\b(?:surf(?:ing|er|ers)?|big[- ]wave|wave riding)\b/i,
     searchTerms: ['surfing', 'surfer', 'big wave'],
   },
   ocean: {
     aliases: ['ocean', 'oceans', 'sea', 'marine', 'underwater'],
     evidence: /\b(?:ocean|oceans|marine|underwater|sea life|seabed|deep sea)\b/i,
+    strongEvidence: /\b(?:ocean|oceans|marine|underwater|sea life|seabed|deep sea)\b/i,
     searchTerms: ['ocean', 'marine', 'underwater'],
   },
   nature: {
     aliases: ['nature', 'natural world'],
     evidence: /\b(?:nature|natural world|wilderness|ecosystem|habitat)\b/i,
+    strongEvidence: /\b(?:nature|natural world|wilderness|ecosystem|habitat|natural environment)\b/i,
     searchTerms: ['nature', 'wilderness'],
   },
   wildlife: {
     aliases: ['wildlife', 'animals', 'animal'],
     evidence: /\b(?:wildlife|wild animals?|animals?|species|habitat|safari)\b/i,
+    strongEvidence: /\b(?:wildlife|wild animals?|animals?|animal behaviour|animal behavior|species|safari)\b/i,
     searchTerms: ['wildlife', 'animals'],
   },
   science: {
@@ -45,6 +49,7 @@ const TOPIC_FAMILIES = {
   space: {
     aliases: ['space', 'astronomy', 'cosmos', 'universe'],
     evidence: /\b(?:space|astronomy|cosmos|universe|planet|planets|galaxy|galaxies|nasa|astronaut|astronauts|moon|mars)\b/i,
+    strongEvidence: /\b(?:outer space|deep space|astronomy|cosmos|universe|galaxy|galaxies|nasa|astronaut|astronauts|moon|mars|astrophysics|planetary|planets)\b/i,
     searchTerms: ['space', 'astronomy', 'universe'],
   },
   technology: {
@@ -300,9 +305,15 @@ function genreMatches(profile, genre) {
   return semantic[genre]?.test(profile.text) || false;
 }
 
-function topicMatches(profile, key) {
+function topicMatches(profile, key, documentaryRequired = false) {
   const family = TOPIC_FAMILIES[key];
-  return Boolean(family?.evidence.test(profile.text));
+  if (!family) return false;
+
+  const pattern = documentaryRequired
+    ? (family.strongEvidence || family.evidence)
+    : family.evidence;
+
+  return Boolean(pattern?.test(profile.text));
 }
 
 export function auditPrompt(show, intent) {
