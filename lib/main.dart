@@ -170,7 +170,7 @@ class _AppShellState extends State<AppShell> {
   int _index = 0;
   bool _loadingProfile = true;
   String _region = 'ZA';
-  Set<String> _services = <String>{'Netflix', 'Prime Video', 'HBO Max', 'Showmax'};
+  Set<String> _services = <String>{};
   Set<String> _preferredGenres = <String>{};
   bool _completedOnly = false;
   Set<int> _saved = <int>{};
@@ -259,6 +259,7 @@ class _AppShellState extends State<AppShell> {
         knownShows: _knownShows,
         region: _region,
         services: _services,
+        preferredGenres: _preferredGenres,
         completedOnly: _completedOnly,
         onToggleSaved: _toggleSaved,
         onFeedback: _recordLocalFeedback,
@@ -1875,6 +1876,7 @@ class ForYouPage extends StatefulWidget {
     required this.knownShows,
     required this.region,
     required this.services,
+    required this.preferredGenres,
     required this.completedOnly,
     required this.onToggleSaved,
     required this.onFeedback,
@@ -1889,6 +1891,7 @@ class ForYouPage extends StatefulWidget {
   final Map<int, ShowItem> knownShows;
   final String region;
   final Set<String> services;
+  final Set<String> preferredGenres;
   final bool completedOnly;
   final ValueChanged<int> onToggleSaved;
   final Future<void> Function(int showId, String reason) onFeedback;
@@ -1909,7 +1912,9 @@ class _ForYouPageState extends State<ForYouPage> {
     final saved = widget.saved.toList()..sort();
     final watched = widget.watched.toList()..sort();
     final dismissed = widget.dismissed.toList()..sort();
-    return '${saved.join(',')}|${watched.join(',')}|${dismissed.join(',')}|${widget.region}|${widget.completedOnly}';
+    final services = widget.services.toList()..sort();
+    final preferredGenres = widget.preferredGenres.toList()..sort();
+    return '${saved.join(',')}|${watched.join(',')}|${dismissed.join(',')}|${widget.region}|${services.join(',')}|${preferredGenres.join(',')}|${widget.completedOnly}';
   }
 
   @override
@@ -1938,13 +1943,14 @@ class _ForYouPageState extends State<ForYouPage> {
       services: widget.services,
       completedOnly: widget.completedOnly,
       excludedIds: excluded,
+      preferredGenres: widget.preferredGenres,
     );
   }
 
   Future<void> _refresh() async {
     final signature = _currentSignature;
     final positives = _positiveShows;
-    if (positives.isEmpty) {
+    if (positives.isEmpty && widget.preferredGenres.isEmpty) {
       if (!mounted) return;
       setState(() {
         _signature = signature;
@@ -1962,48 +1968,89 @@ class _ForYouPageState extends State<ForYouPage> {
 
     try {
       final excluded = <int>{...widget.dismissed, ...widget.watched};
-      final anchor = positives.firstWhere(
-        (show) => widget.saved.contains(show.id),
-        orElse: () => positives.first,
-      );
+      final savedShows = positives.where((show) => widget.saved.contains(show.id)).toList();
+      final anchors = <ShowItem>[...savedShows, ...positives.where((show) => !widget.saved.contains(show.id))];
+      final ShowItem? anchor = anchors.isNotEmpty ? anchors.first : null;
+      final ShowItem? secondAnchor = anchors.length > 1 ? anchors[1] : null;
 
+      // Explicit profile tastes count strongly, while real saves/watches keep
+      // adapting the profile over time. This mirrors the blend used by modern
+      // streaming recommenders: stated taste + behavioural taste.
       final genreCounts = <String, int>{};
+      for (final genre in widget.preferredGenres) {
+        genreCounts[genre] = (genreCounts[genre] ?? 0) + 4;
+      }
       for (final show in positives) {
+        final weight = widget.saved.contains(show.id) ? 3 : 2;
         for (final genre in show.genres) {
-          genreCounts[genre] = (genreCounts[genre] ?? 0) + 1;
+          genreCounts[genre] = (genreCounts[genre] ?? 0) + weight;
         }
       }
       final topGenres = genreCounts.entries.toList()
         ..sort((a, b) => b.value.compareTo(a.value));
-      final genreNames = topGenres.take(2).map((entry) => entry.key).toList();
+      final genreNames = topGenres.take(3).map((entry) => entry.key).toList();
 
-      final futures = <Future<RecommendationResult>>[
-        _recommend('Something like ${anchor.title}', excluded),
+      final requestSpecs = <({String key, String query})>[
+        if (anchor != null) (key: 'anchor1', query: 'Something like ${anchor.title}'),
+        if (secondAnchor != null) (key: 'anchor2', query: 'Something like ${secondAnchor.title}'),
         if (genreNames.isNotEmpty)
-          _recommend('A really good ${genreNames.join(' ')} series', excluded),
-        _recommend('Something easy to watch with episodes under 40 minutes', excluded),
+          (key: 'taste', query: 'A highly rated ${genreNames.take(2).join(' ')} series'),
+        if (genreNames.length >= 2)
+          (key: 'blend', query: 'A ${genreNames[0]} ${genreNames[1]} series with a different feel'),
+        (key: 'easy', query: 'Something easy to watch with episodes under 40 minutes'),
       ];
-      final results = await Future.wait(futures);
+      final results = await Future.wait(
+        requestSpecs.map((spec) => _recommend(spec.query, excluded)),
+      );
+      final byKey = <String, RecommendationResult>{
+        for (var i = 0; i < requestSpecs.length; i++) requestSpecs[i].key: results[i],
+      };
 
-      final sections = <_ForYouSection>[
-        _ForYouSection(
+      final used = <int>{...excluded, ...positives.map((show) => show.id)};
+      List<ShowItem> uniqueFrom(String key, {int take = 6}) {
+        final output = <ShowItem>[];
+        for (final show in byKey[key]?.shows ?? const <ShowItem>[]) {
+          if (used.add(show.id)) output.add(show);
+          if (output.length >= take) break;
+        }
+        return output;
+      }
+
+      final sections = <_ForYouSection>[];
+      if (anchor != null) {
+        sections.add(_ForYouSection(
           title: 'Because you ${widget.saved.contains(anchor.id) ? 'saved' : 'watched'} ${anchor.title}',
-          subtitle: 'Using a show you chose as the reference point.',
-          shows: results[0].shows.where((show) => show.id != anchor.id && !excluded.contains(show.id)).take(6).toList(),
-        ),
-      ];
-      var resultIndex = 1;
+          subtitle: 'A close match to something you deliberately chose.',
+          shows: uniqueFrom('anchor1'),
+        ));
+      }
+      if (secondAnchor != null) {
+        sections.add(_ForYouSection(
+          title: 'Inspired by ${secondAnchor.title}',
+          subtitle: 'A second taste signal keeps your recommendations from becoming repetitive.',
+          shows: uniqueFrom('anchor2'),
+        ));
+      }
       if (genreNames.isNotEmpty) {
         sections.add(_ForYouSection(
-          title: 'Your kind of ${genreNames.first.toLowerCase()}',
-          subtitle: 'Based on genres that appear in your saved and watched titles.',
-          shows: results[resultIndex++].shows.where((show) => !excluded.contains(show.id)).take(6).toList(),
+          title: 'Your ${genreNames.take(2).join(' + ')} lane',
+          subtitle: widget.preferredGenres.isEmpty
+              ? 'Learned from the shows you save and watch.'
+              : 'Blending the genres you chose in Profile with what you actually watch.',
+          shows: uniqueFrom('taste'),
+        ));
+      }
+      if (genreNames.length >= 2) {
+        sections.add(_ForYouSection(
+          title: 'A different side of your taste',
+          subtitle: 'Familiar ingredients, but deliberately less repetitive.',
+          shows: uniqueFrom('blend'),
         ));
       }
       sections.add(_ForYouSection(
         title: 'Easy watches tonight',
-        subtitle: 'Shorter episodes, filtered through your normal profile settings.',
-        shows: results[resultIndex].shows.where((show) => !excluded.contains(show.id)).take(6).toList(),
+        subtitle: 'Lower-friction picks that still respect your services and taste.',
+        shows: uniqueFrom('easy'),
       ));
 
       final allShows = sections.expand((section) => section.shows);
@@ -2042,10 +2089,10 @@ class _ForYouPageState extends State<ForYouPage> {
             ),
             const SizedBox(height: 10),
             const Text(
-              'These picks use choices you have actually made in ForFlickSakes. Pull down any time to refresh them.',
+              'These picks blend the genres you choose with what you save, watch and reject. Pull down any time to refresh them.',
             ),
             const SizedBox(height: 26),
-            if (positives.isEmpty)
+            if (positives.isEmpty && widget.preferredGenres.isEmpty)
               Container(
                 padding: const EdgeInsets.all(24),
                 decoration: BoxDecoration(
@@ -2338,12 +2385,12 @@ class ProfilePage extends StatelessWidget {
           const SizedBox(height: 30),
           Text('Favourite genres', style: Theme.of(context).textTheme.titleLarge),
           const SizedBox(height: 8),
-          const Text('Optional — these gently steer recommendations without blocking other great matches.'),
+          const Text('Choose what you genuinely enjoy. These shape For You and gently break ties in search; an explicit search always wins.'),
           const SizedBox(height: 14),
           Wrap(
             spacing: 10,
             runSpacing: 12,
-            children: const <String>['Documentary', 'Crime', 'Thriller', 'Mystery', 'Comedy', 'Drama', 'Action', 'Science-Fiction', 'Horror', 'Romance', 'Fantasy'].map((genre) {
+            children: const <String>['Documentary', 'Crime', 'Thriller', 'Mystery', 'Comedy', 'Drama', 'Action', 'Adventure', 'Science-Fiction', 'Horror', 'Romance', 'Fantasy', 'Animation', 'Family', 'Reality', 'History', 'Sports'].map((genre) {
               final selected = preferredGenres.contains(genre);
               return FilterChip(
                 selected: selected,
@@ -2368,25 +2415,34 @@ class ProfilePage extends StatelessWidget {
           const SizedBox(height: 30),
           Text(_t(languageCode, 'streamingServices'), style: Theme.of(context).textTheme.titleLarge),
           const SizedBox(height: 8),
-          const Text('These choices are saved across restarts.'),
+          const Text('Leave all services off to search everywhere. Select one or more to show only titles whose availability is verified for your streaming region.'),
           const SizedBox(height: 14),
           Wrap(
             spacing: 10,
             runSpacing: 12,
-            children: serviceOptions.map((service) {
-              final selected = services.contains(service);
-              return FilterChip(
-                selected: selected,
-                label: Text(service),
+            children: [
+              FilterChip(
+                selected: services.isEmpty,
+                label: const Text('Any service'),
                 selectedColor: const Color(0xFF4FD5CB),
-                labelStyle: TextStyle(color: selected ? const Color(0xFF091310) : Colors.white),
-                onSelected: (_) {
-                  final updated = {...services};
-                  if (!updated.add(service)) updated.remove(service);
-                  onServicesChanged(updated);
-                },
-              );
-            }).toList(),
+                labelStyle: TextStyle(color: services.isEmpty ? const Color(0xFF091310) : Colors.white),
+                onSelected: (_) => onServicesChanged(<String>{}),
+              ),
+              ...serviceOptions.map((service) {
+                final selected = services.contains(service);
+                return FilterChip(
+                  selected: selected,
+                  label: Text(service),
+                  selectedColor: const Color(0xFF4FD5CB),
+                  labelStyle: TextStyle(color: selected ? const Color(0xFF091310) : Colors.white),
+                  onSelected: (_) {
+                    final updated = {...services};
+                    if (!updated.add(service)) updated.remove(service);
+                    onServicesChanged(updated);
+                  },
+                );
+              }),
+            ],
           ),
           const SizedBox(height: 30),
           SwitchListTile(

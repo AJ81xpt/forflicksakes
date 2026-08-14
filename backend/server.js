@@ -1147,6 +1147,10 @@ async function promptCandidatesV2(query, intent, profile = {}) {
       violations: item.audit?.violations || [],
       requiredMatches: item.audit?.requiredMatches || [],
       topicHits: item.audit?.topicHits || [],
+      qualifierHits: item.audit?.qualifierHits || [],
+      originHits: item.audit?.originHits || [],
+      eraHits: item.audit?.eraHits || [],
+      semanticHits: item.audit?.semanticHits || [],
       summary: String(item.show?.summary || '')
         .replace(/<[^>]*>/g, ' ')
         .replace(/\s+/g, ' ')
@@ -1155,10 +1159,11 @@ async function promptCandidatesV2(query, intent, profile = {}) {
     }))
   ));
 
+  const resultBudget = requestedCatalogIds(profile.services).length ? 24 : 12;
   const ranked = scored
     .filter((item) => item.passed && item.score >= (intent.requiredGenres.length ? 24 : 8))
     .sort((a, b) => b.score - a.score)
-    .slice(0, 8);
+    .slice(0, resultBudget);
 
   console.log('[DISCOVERY]', JSON.stringify({
     query,
@@ -1168,6 +1173,14 @@ async function promptCandidatesV2(query, intent, profile = {}) {
     mappedExternalTitles: mappedDiscoveryCount,
     priorityCandidates: priorityShows.length,
     enrichmentQueue: enrichmentQueue.length,
+    constraints: {
+      genres: intent.requiredGenres || [],
+      topics: intent.topicGroups || [],
+      specific: intent.topicQualifierTerms || [],
+      origins: intent.originGroups || [],
+      eras: intent.eraGroups || [],
+      subjects: intent.semanticTerms || [],
+    },
     strictMatches: ranked.length,
     strictMatchTitles: ranked.map((item) => item.show?.name).filter(Boolean),
   }));
@@ -1188,7 +1201,7 @@ async function moodCandidatesV2(mood) {
     .map((show) => ({ show, ...scoreMoodV2(show, mood) }))
     .filter((item) => item.passed)
     .sort((a, b) => b.score - a.score)
-    .slice(0, 8);
+    .slice(0, 20);
 }
 
 app.get('/health', (_request, response) => {
@@ -1254,18 +1267,22 @@ app.post('/recommendations', async (request, response) => {
       .map((value) => String(value).trim().toLowerCase())
       .filter(Boolean);
     const region = String(profile.region || 'ZA').toUpperCase();
-    if (requestedServices.length && results.length) {
+    if (requestedServices.length) {
+      interpretation = [...interpretation, `Streaming: ${requestedServices.join(' / ')} in ${region}`];
       const serviceAliases = {
         'prime video': ['prime video', 'amazon prime', 'amazon prime video'],
         'hbo max': ['hbo max', 'max'],
         'apple tv+': ['apple tv+', 'apple tv plus'],
+        'disney+': ['disney+', 'disney plus'],
         'dstv stream': ['dstv stream', 'dstv'],
       };
       const wanted = new Set(requestedServices.flatMap((name) => serviceAliases[name] || [name]));
-      const checked = await Promise.all(results.slice(0, 16).map(async (item) => {
+      const checked = await Promise.all(results.slice(0, 30).map(async (item) => {
         const availability = await resolveAvailability({ showId: item.id, region });
+        if (!availability?.verified && availability?.status !== 'verified-stale') return null;
         const names = (availability.providers || []).map((provider) => String(provider.name || '').trim().toLowerCase());
-        return names.some((name) => [...wanted].some((target) => name === target || name.includes(target) || target.includes(name))) ? item : null;
+        const matchedProviders = names.filter((name) => [...wanted].some((target) => name === target || name.includes(target) || target.includes(name)));
+        return matchedProviders.length ? { ...item, matchReasons: [...item.matchReasons, `Verified on ${matchedProviders[0]}`] } : null;
       }));
       results = checked.filter(Boolean);
     }

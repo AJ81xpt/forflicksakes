@@ -28,7 +28,7 @@ class PersonalizationSnapshot {
 
   factory PersonalizationSnapshot.defaults() => const PersonalizationSnapshot(
         region: 'ZA',
-        services: {'Netflix', 'Prime Video', 'HBO Max', 'Showmax'},
+        services: <String>{},
         preferredGenres: <String>{},
         completedOnly: false,
         savedIds: <int>{},
