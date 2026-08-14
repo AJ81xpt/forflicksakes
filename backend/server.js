@@ -1,4 +1,4 @@
-﻿import { fileURLToPath } from 'node:url';
+import { fileURLToPath } from 'node:url';
 import 'dotenv/config';
 import cors from 'cors';
 import express from 'express';
@@ -517,7 +517,7 @@ async function externalTopicDiscovery(query, intent) {
 }
 
 async function mapDiscoveryTitlesToTvMaze(titles) {
-  const selected = titles.slice(0, 24);
+  const selected = titles.slice(0, 30);
   const resolved = await Promise.all(selected.map(async (title) => {
     try {
       const matches = await tvMazeSearch(title);
@@ -1053,8 +1053,9 @@ async function promptCandidatesV2(query, intent) {
 
   let discoveredTitleCount = 0;
   let mappedDiscoveryCount = 0;
+  let discoveredTitles = [];
   try {
-    const discoveredTitles = await externalTopicDiscovery(query, intent);
+    discoveredTitles = await externalTopicDiscovery(query, intent);
     discoveredTitleCount = discoveredTitles.length;
     const discoveredShows = await mapDiscoveryTitlesToTvMaze(discoveredTitles);
     mappedDiscoveryCount = discoveredShows.filter(Boolean).length;
@@ -1126,6 +1127,7 @@ async function promptCandidatesV2(query, intent) {
     query,
     searches: [...searches].slice(0, 12),
     externalTitles: discoveredTitleCount,
+    externalTitleNames: discoveredTitles || [],
     mappedExternalTitles: mappedDiscoveryCount,
     priorityCandidates: priorityShows.length,
     enrichmentQueue: enrichmentQueue.length,
