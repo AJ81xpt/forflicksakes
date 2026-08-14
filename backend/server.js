@@ -1,4 +1,4 @@
-import { fileURLToPath } from 'node:url';
+﻿import { fileURLToPath } from 'node:url';
 import 'dotenv/config';
 import cors from 'cors';
 import express from 'express';
@@ -1093,8 +1093,31 @@ async function promptCandidatesV2(query, intent) {
 
   const enrichmentQueue = [...priorityShows, ...fallbackShows].slice(0, 64);
   const enriched = await enrichShowsV2(enrichmentQueue, 64);
-  const ranked = enriched
-    .map((show) => ({ show, ...scorePromptV2(show, query, intent) }))
+
+  const scored = enriched.map((show) => ({
+    show,
+    ...scorePromptV2(show, query, intent),
+  }));
+
+  console.log('[STRICT_AUDIT]', JSON.stringify(
+    scored.map((item) => ({
+      title: item.show?.name || null,
+      type: item.show?.type || null,
+      genres: item.show?.genres || [],
+      score: item.score,
+      passed: item.passed,
+      violations: item.audit?.violations || [],
+      requiredMatches: item.audit?.requiredMatches || [],
+      topicHits: item.audit?.topicHits || [],
+      summary: String(item.show?.summary || '')
+        .replace(/<[^>]*>/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .slice(0, 180),
+    }))
+  ));
+
+  const ranked = scored
     .filter((item) => item.passed && item.score >= (intent.requiredGenres.length ? 24 : 8))
     .sort((a, b) => b.score - a.score)
     .slice(0, 8);
@@ -1306,5 +1329,6 @@ app.get('/privacy', (req, res) => {
 app.listen(port, '0.0.0.0', () => {
   console.log(`ForFlickSakes live backend running on http://localhost:${port}`);
 });
+
 
 
