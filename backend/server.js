@@ -1269,6 +1269,7 @@ app.post('/recommendations', async (request, response) => {
     const region = String(profile.region || 'ZA').toUpperCase();
     if (requestedServices.length) {
       interpretation = [...interpretation, `Streaming: ${requestedServices.join(' / ')} in ${region}`];
+
       const serviceAliases = {
         'prime video': ['prime video', 'amazon prime', 'amazon prime video'],
         'hbo max': ['hbo max', 'max'],
@@ -1276,21 +1277,105 @@ app.post('/recommendations', async (request, response) => {
         'disney+': ['disney+', 'disney plus'],
         'dstv stream': ['dstv stream', 'dstv'],
       };
-      const wanted = new Set(requestedServices.flatMap((name) => serviceAliases[name] || [name]));
-      const checked = await Promise.all(results.slice(0, 30).map(async (item) => {
-        const availability = await resolveAvailability({ showId: item.id, region });
-        if (!availability?.verified && availability?.status !== 'verified-stale') return null;
-        const names = (availability.providers || []).map((provider) => String(provider.name || '').trim().toLowerCase());
-        const matchedProviders = names.filter((name) => [...wanted].some((target) => name === target || name.includes(target) || target.includes(name)));
-        return matchedProviders.length ? { ...item, matchReasons: [...item.matchReasons, `Verified on ${matchedProviders[0]}`] } : null;
-      }));
-      results = checked.filter(Boolean);
+
+      const wanted = new Set(
+        requestedServices.flatMap((name) => serviceAliases[name] || [name]),
+      );
+
+      const checked = await Promise.all(
+        results.slice(0, 30).map(async (item) => {
+          try {
+            const availability = await resolveAvailability({
+              showId: item.id,
+              region,
+            });
+
+            const isVerified =
+              availability?.verified === true ||
+              availability?.status === 'verified-stale';
+
+            if (!isVerified) {
+              return {
+                item,
+                verified: false,
+                matched: false,
+                matchedProvider: null,
+              };
+            }
+
+            const names = (availability.providers || [])
+              .map((provider) =>
+                String(provider.name || '').trim().toLowerCase(),
+              );
+
+            const matchedProviders = names.filter((name) =>
+              [...wanted].some(
+                (target) =>
+                  name === target ||
+                  name.includes(target) ||
+                  target.includes(name),
+              ),
+            );
+
+            return {
+              item,
+              verified: true,
+              matched: matchedProviders.length > 0,
+              matchedProvider: matchedProviders[0] || null,
+            };
+          } catch (error) {
+            console.warn(
+              '[AVAILABILITY] recommendation verification skipped:',
+              item.id,
+              error?.message || error,
+            );
+
+            return {
+              item,
+              verified: false,
+              matched: false,
+              matchedProvider: null,
+            };
+          }
+        }),
+      );
+
+      const verifiedMatches = checked
+        .filter((entry) => entry.matched)
+        .map((entry) => ({
+          ...entry.item,
+          matchReasons: [
+            ...entry.item.matchReasons,
+            `Verified on ${entry.matchedProvider}`,
+          ],
+        }));
+
+      const anyVerificationSucceeded = checked.some(
+        (entry) => entry.verified,
+      );
+
+      if (verifiedMatches.length) {
+        // Best case: we have relevant titles confirmed on the selected service.
+        results = verifiedMatches;
+      } else if (anyVerificationSucceeded) {
+        // Availability worked, but none of these titles are verified on the
+        // selected services. Return no misleading service matches.
+        results = [];
+      } else {
+        // Availability itself is temporarily unavailable. Do NOT destroy the
+        // recommendation experience. Keep the relevant picks and let Where
+        // to Watch verify them when availability recovers.
+        console.warn(
+          '[AVAILABILITY] no provider checks could be verified; returning relevance fallback',
+        );
+        results = results.slice(0, 10);
+      }
     }
 
     response.json({ mode, mood, interpretation, results: results.slice(0, 10) });
   } catch (error) {
     console.error(error);
-    response.status(502).json({ error: 'Live catalogue lookup failed.' });
+    response.status(502).json({ error: 'Recommendations are temporarily unavailable. Please try again.' });
   }
 });
 

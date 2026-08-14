@@ -120,6 +120,10 @@ class ApiService {
           },
         );
 
+    debugPrint(
+      'RECOMMEND RESPONSE ${response.statusCode}: ${response.body}',
+    );
+
     if (response.statusCode != 200) {
       String message =
           'Recommendation service returned ${response.statusCode}.';
@@ -196,6 +200,10 @@ class ApiService {
             );
           },
         );
+
+    debugPrint(
+      'RECOMMEND RESPONSE ${response.statusCode}: ${response.body}',
+    );
 
     if (response.statusCode != 200) {
       String message =

@@ -468,14 +468,16 @@ class _DiscoverPageState extends State<DiscoverPage> {
         _interpretation = recommendation.interpretation;
         _loading = false;
         if (_results.isEmpty) {
-          _error = 'No titles passed every requirement. Try relaxing one constraint.';
+          _error = 'We couldn''t find a strong match for that yet. Try a broader search or change your streaming services.';
         }
       });
-    } catch (error) {
+    } catch (error, stackTrace) {
+      debugPrint('RECOMMEND ERROR: $error');
+      debugPrintStack(stackTrace: stackTrace);
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _error = 'Oops, looks like something went wrong. Please try again.';
+        _error = error.toString().replaceFirst('Exception: ', '');
       });
     }
   }
@@ -512,11 +514,13 @@ class _DiscoverPageState extends State<DiscoverPage> {
           _error = 'No strong ${mood.title.toLowerCase()} matches were found.';
         }
       });
-    } catch (error) {
+    } catch (error, stackTrace) {
+      debugPrint('RECOMMEND ERROR: $error');
+      debugPrintStack(stackTrace: stackTrace);
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _error = 'Oops, looks like something went wrong. Please try again.';
+        _error = error.toString().replaceFirst('Exception: ', '');
       });
     }
   }
@@ -2067,7 +2071,7 @@ class _ForYouPageState extends State<ForYouPage> {
       setState(() {
         _signature = signature;
         _loading = false;
-        _error = 'Oops, looks like something went wrong. Please try again.';
+        _error = 'Recommendations are taking a little longer right now. Please try again.';
       });
     }
   }

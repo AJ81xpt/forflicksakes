@@ -53,9 +53,28 @@ class PersonalizationStore {
   Future<PersonalizationSnapshot> load() async {
     final prefs = await SharedPreferences.getInstance();
     final defaults = PersonalizationSnapshot.defaults();
+    final storedServices = _normalizeServices(
+      (prefs.getStringList(_servicesKey) ?? defaults.services.toList()).toSet(),
+    );
+
+    // Older builds defaulted users into several streaming services at once.
+    // Treat that legacy default as "Any service" so upgrades do not silently
+    // restrict search.
+    const legacyDefaultServices = <String>{
+      'Netflix',
+      'Prime Video',
+      'HBO Max',
+      'Showmax',
+    };
+
+    final services = storedServices.length == legacyDefaultServices.length &&
+            storedServices.containsAll(legacyDefaultServices)
+        ? <String>{}
+        : storedServices;
+
     return PersonalizationSnapshot(
       region: prefs.getString(_regionKey) ?? defaults.region,
-      services: _normalizeServices((prefs.getStringList(_servicesKey) ?? defaults.services.toList()).toSet()),
+      services: services,
       preferredGenres: (prefs.getStringList(_preferredGenresKey) ?? const <String>[]).toSet(),
       completedOnly: prefs.getBool(_completedOnlyKey) ?? defaults.completedOnly,
       savedIds: _decodeIds(prefs.getStringList(_savedIdsKey)),
