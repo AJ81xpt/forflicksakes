@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import '../models/show_item.dart';
@@ -226,6 +227,8 @@ class ApiService {
       '?region=${Uri.encodeQueryComponent(region)}',
     );
 
+    debugPrint('WATCH REQUEST: $uri');
+
     final response = await _client
         .get(uri)
         .timeout(
@@ -237,6 +240,8 @@ class ApiService {
             );
           },
         );
+
+    debugPrint('WATCH RESPONSE ${response.statusCode}: ${response.body}');
 
     if (response.statusCode != 200) {
       String message =
