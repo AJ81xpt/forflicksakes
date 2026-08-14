@@ -1026,6 +1026,15 @@ async function exactTitleCandidate(query) {
   };
 }
 
+const TOPIC_TITLE_SEEDS = {
+  surfing: [
+    '100 Foot Wave',
+    'Riding Giants',
+    'Surfwise',
+    'The Endless Summer',
+    'Step Into Liquid',
+  ],
+};
 async function promptCandidatesV2(query, intent) {
   const catalogue = await catalogueShows();
   const pool = new Map(catalogue.map((show) => [show.id, show]));
@@ -1034,7 +1043,10 @@ async function promptCandidatesV2(query, intent) {
   const cleaned = queryTokens(query).slice(0, 6).join(' ');
   if (cleaned) searches.add(cleaned);
   for (const term of intent.searchTerms || []) searches.add(term);
-  for (const topic of intent.topicGroups || []) searches.add(topic);
+  for (const topic of intent.topicGroups || []) {
+    searches.add(topic);
+    for (const seed of TOPIC_TITLE_SEEDS[topic] || []) searches.add(seed);
+  }
   if (intent.requiredGenres?.includes('Documentary')) searches.add('documentary');
 
   // Title search is useful for exact/near-title candidates. Anything found here
