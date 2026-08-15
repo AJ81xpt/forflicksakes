@@ -1,3 +1,5 @@
+import { dirname } from 'node:path';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import 'dotenv/config';
 import cors from 'cors';
@@ -81,10 +83,89 @@ const availabilityCache = new Map();
 const availabilityInFlight = new Map();
 const AVAILABILITY_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const AVAILABILITY_NEGATIVE_TTL_MS = 5 * 60 * 1000;
-const AVAILABILITY_STALE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+const AVAILABILITY_STALE_TTL_MS = 60 * 24 * 60 * 60 * 1000;
 const AVAILABILITY_QUOTA_COOLDOWN_MS = 6 * 60 * 60 * 1000;
 let availabilityQuotaBlockedUntil = 0;
 const availabilityLastVerified = new Map();
+const AVAILABILITY_PERSIST_PATH =
+  process.env.AVAILABILITY_CACHE_FILE?.trim() ||
+  './data/availability-cache.json';
+
+let availabilityPersistLoaded = false;
+
+function loadPersistentAvailabilityCache() {
+  if (availabilityPersistLoaded) return;
+  availabilityPersistLoaded = true;
+
+  try {
+    if (!existsSync(AVAILABILITY_PERSIST_PATH)) return;
+
+    const parsed = JSON.parse(
+      readFileSync(AVAILABILITY_PERSIST_PATH, 'utf8'),
+    );
+
+    const entries = Array.isArray(parsed?.entries) ? parsed.entries : [];
+
+    for (const entry of entries) {
+      const key = String(entry?.key || '');
+      const value = entry?.value;
+      const expiresAt = Number(entry?.expiresAt || 0);
+
+      if (!key || !value || !Number.isFinite(expiresAt)) continue;
+      if (expiresAt <= Date.now()) continue;
+
+      availabilityLastVerified.set(key, {
+        value,
+        expiresAt,
+      });
+    }
+
+    console.log(
+      '[AVAILABILITY] loaded ' +
+        availabilityLastVerified.size +
+        ' remembered verified entries',
+    );
+  } catch (error) {
+    console.warn(
+      '[AVAILABILITY] persistent cache load skipped:',
+      error?.message || error,
+    );
+  }
+}
+
+function persistAvailabilityCache() {
+  try {
+    const entries = [...availabilityLastVerified.entries()]
+      .filter(([, entry]) => Number(entry?.expiresAt || 0) > Date.now())
+      .map(([key, entry]) => ({
+        key,
+        expiresAt: entry.expiresAt,
+        value: entry.value,
+      }));
+
+    mkdirSync(dirname(AVAILABILITY_PERSIST_PATH), {
+      recursive: true,
+    });
+
+    writeFileSync(
+      AVAILABILITY_PERSIST_PATH,
+      JSON.stringify(
+        {
+          savedAt: new Date().toISOString(),
+          entries,
+        },
+        null,
+        2,
+      ),
+      'utf8',
+    );
+  } catch (error) {
+    console.warn(
+      '[AVAILABILITY] persistent cache save skipped:',
+      error?.message || error,
+    );
+  }
+}
 
 const SUPPORTED_AVAILABILITY_REGIONS = new Set([
   'ZA', 'GB', 'US',
@@ -125,6 +206,7 @@ function rememberVerifiedAvailability(showId, region, value) {
 }
 
 function readLastVerifiedAvailability(showId, region) {
+  loadPersistentAvailabilityCache();
   const key = availabilityCacheKey(showId, region);
   const entry = availabilityLastVerified.get(key);
   if (!entry) return null;
