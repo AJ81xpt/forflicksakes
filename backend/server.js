@@ -1355,7 +1355,18 @@ app.post('/recommendations', async (request, response) => {
     );
     let results = candidates
       .map(({ show, score, reasons, confidence }) => toShowItem(show, score, reasons, confidence))
-      .filter((item) => item.poster && item.title && !excludedIds.has(Number(item.id)))
+      .filter((item) =>
+        item.title &&
+        (
+          interpretation.some((label) =>
+            String(label).startsWith('Exact title:')
+          ) ||
+          (
+            item.poster &&
+            !excludedIds.has(Number(item.id))
+          )
+        )
+      )
       .sort((a, b) => b.recommendationScore - a.recommendationScore);
 
     const requestedServices = (Array.isArray(profile.services) ? profile.services : [])
