@@ -1362,7 +1362,13 @@ app.post('/recommendations', async (request, response) => {
       .map((value) => String(value).trim().toLowerCase())
       .filter(Boolean);
     const region = String(profile.region || 'ZA').toUpperCase();
-    if (requestedServices.length) {
+    // Exact-title lookups must never be removed by streaming preferences.
+    // Availability belongs to Where to Watch, not title existence.
+    const isExactTitleLookup =
+      mode === 'prompt' &&
+      interpretation.some((label) => String(label).startsWith('Exact title:'));
+
+    if (requestedServices.length && !isExactTitleLookup) {
       interpretation = [...interpretation, `Streaming: ${requestedServices.join(' / ')} in ${region}`];
 
       const serviceAliases = {
