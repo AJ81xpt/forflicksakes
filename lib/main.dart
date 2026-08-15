@@ -8,7 +8,6 @@ import 'models/show_item.dart';
 import 'services/api_service.dart';
 import 'services/personalization_store.dart';
 
-
 const _ffsText = <String, Map<String, String>>{
   'en': {
     'discover': 'Discover',
@@ -18,14 +17,16 @@ const _ffsText = <String, Map<String, String>>{
     'concierge': 'YOUR WATCH CONCIERGE',
     'brand': 'FOR FLICK SAKES.',
     'stop': 'Stop scrolling.\nStart watching.',
-    'browse': 'Browse a mood for instant inspiration, or describe your perfect watch for precise picks.',
+    'browse':
+        'Browse a mood for instant inspiration, or describe your perfect watch for precise picks.',
     'forYouTag': 'Because your taste is starting to show.',
     'watchlistEmpty': 'For Flick Sakes... save something worth watching.',
     'profileTitle': 'Profile & taste',
     'streamingRegion': 'Streaming region',
     'streamingServices': 'Preferred streaming services',
     'stored': 'Stored on this device',
-    'storedBody': 'Your preferences, watch history and watchlist stay on this device.',
+    'storedBody':
+        'Your preferences, watch history and watchlist stay on this device.',
     'reset': 'Reset personalisation',
   },
   'pt': {
@@ -36,7 +37,8 @@ const _ffsText = <String, Map<String, String>>{
     'concierge': 'O TEU CONCIERGE DE SÉRIES',
     'brand': 'FOR FLICK SAKES.',
     'stop': 'Para de procurar.\nComeça a ver.',
-    'browse': 'Escolhe um estado de espírito ou descreve exatamente o que queres ver.',
+    'browse':
+        'Escolhe um estado de espírito ou descreve exatamente o que queres ver.',
     'forYouTag': 'Porque o teu gosto começa a aparecer.',
     'watchlistEmpty': 'For Flick Sakes... guarda algo que valha a pena ver.',
     'profileTitle': 'Perfil e preferências',
@@ -44,7 +46,8 @@ const _ffsText = <String, Map<String, String>>{
     'streamingServices': 'Serviços de streaming',
     'language': 'Idioma da aplicação',
     'stored': 'Guardado neste dispositivo',
-    'storedBody': 'As tuas preferências, histórico e lista ficam neste dispositivo.',
+    'storedBody':
+        'As tuas preferências, histórico e lista ficam neste dispositivo.',
     'reset': 'Repor personalização',
   },
   'es': {
@@ -55,7 +58,8 @@ const _ffsText = <String, Map<String, String>>{
     'concierge': 'TU CONCIERGE DE SERIES',
     'brand': 'FOR FLICK SAKES.',
     'stop': 'Deja de buscar.\nEmpieza a ver.',
-    'browse': 'Elige un estado de ánimo o describe exactamente qué quieres ver.',
+    'browse':
+        'Elige un estado de ánimo o describe exactamente qué quieres ver.',
     'forYouTag': 'Porque tu gusto ya empieza a notarse.',
     'watchlistEmpty': 'For Flick Sakes... guarda algo que merezca la pena.',
     'profileTitle': 'Perfil y preferencias',
@@ -63,7 +67,8 @@ const _ffsText = <String, Map<String, String>>{
     'streamingServices': 'Servicios de streaming',
     'language': 'Idioma de la aplicación',
     'stored': 'Guardado en este dispositivo',
-    'storedBody': 'Tus preferencias, historial y lista se guardan en este dispositivo.',
+    'storedBody':
+        'Tus preferencias, historial y lista se guardan en este dispositivo.',
     'reset': 'Restablecer personalización',
   },
   'fr': {
@@ -74,15 +79,18 @@ const _ffsText = <String, Map<String, String>>{
     'concierge': 'VOTRE CONCIERGE SÉRIES',
     'brand': 'FOR FLICK SAKES.',
     'stop': 'Arrêtez de chercher.\nCommencez à regarder.',
-    'browse': 'Choisissez une humeur ou décrivez exactement ce que vous voulez regarder.',
+    'browse':
+        'Choisissez une humeur ou décrivez exactement ce que vous voulez regarder.',
     'forYouTag': 'Parce que vos goûts commencent à se dessiner.',
-    'watchlistEmpty': 'For Flick Sakes... gardez quelque chose qui vaut le détour.',
+    'watchlistEmpty':
+        'For Flick Sakes... gardez quelque chose qui vaut le détour.',
     'profileTitle': 'Profil et préférences',
     'streamingRegion': 'Région de streaming',
     'streamingServices': 'Services de streaming',
     'language': 'Langue de l’application',
     'stored': 'Stocké sur cet appareil',
-    'storedBody': 'Vos préférences, historique et liste restent sur cet appareil.',
+    'storedBody':
+        'Vos préférences, historique et liste restent sur cet appareil.',
     'reset': 'Réinitialiser la personnalisation',
   },
   'de': {
@@ -93,7 +101,8 @@ const _ffsText = <String, Map<String, String>>{
     'concierge': 'DEIN SERIEN-CONCIERGE',
     'brand': 'FOR FLICK SAKES.',
     'stop': 'Hör auf zu suchen.\nFang an zu schauen.',
-    'browse': 'Wähle eine Stimmung oder beschreibe genau, was du sehen möchtest.',
+    'browse':
+        'Wähle eine Stimmung oder beschreibe genau, was du sehen möchtest.',
     'forYouTag': 'Weil dein Geschmack langsam sichtbar wird.',
     'watchlistEmpty': 'For Flick Sakes... speichere etwas, das sich lohnt.',
     'profileTitle': 'Profil und Vorlieben',
@@ -172,6 +181,7 @@ class _AppShellState extends State<AppShell> {
   String _region = 'ZA';
   Set<String> _services = <String>{};
   Set<String> _preferredGenres = <String>{};
+  bool _hideKidsFamilyAnimation = false;
   bool _completedOnly = false;
   Set<int> _saved = <int>{};
   Set<int> _dismissed = <int>{};
@@ -192,6 +202,7 @@ class _AppShellState extends State<AppShell> {
       _region = snapshot.region;
       _services = snapshot.services;
       _preferredGenres = snapshot.preferredGenres;
+      _hideKidsFamilyAnimation = snapshot.hideKidsFamilyAnimation;
       _completedOnly = snapshot.completedOnly;
       _saved = snapshot.savedIds;
       _dismissed = snapshot.dismissedIds;
@@ -203,11 +214,12 @@ class _AppShellState extends State<AppShell> {
   }
 
   Future<void> _persistPreferences() => _personalization.savePreferences(
-        region: _region,
-        services: _services,
-        preferredGenres: _preferredGenres,
-        completedOnly: _completedOnly,
-      );
+    region: _region,
+    services: _services,
+    preferredGenres: _preferredGenres,
+    hideKidsFamilyAnimation: _hideKidsFamilyAnimation,
+    completedOnly: _completedOnly,
+  );
 
   void _toggleSaved(int id) {
     setState(() {
@@ -245,6 +257,7 @@ class _AppShellState extends State<AppShell> {
         region: _region,
         services: _services,
         preferredGenres: _preferredGenres,
+        hideKidsFamilyAnimation: _hideKidsFamilyAnimation,
         completedOnly: _completedOnly,
         excludedIds: {..._dismissed, ..._watched},
         onToggleSaved: _toggleSaved,
@@ -260,6 +273,7 @@ class _AppShellState extends State<AppShell> {
         region: _region,
         services: _services,
         preferredGenres: _preferredGenres,
+        hideKidsFamilyAnimation: _hideKidsFamilyAnimation,
         completedOnly: _completedOnly,
         onToggleSaved: _toggleSaved,
         onFeedback: _recordLocalFeedback,
@@ -278,6 +292,7 @@ class _AppShellState extends State<AppShell> {
         region: _region,
         services: _services,
         preferredGenres: _preferredGenres,
+        hideKidsFamilyAnimation: _hideKidsFamilyAnimation,
         completedOnly: _completedOnly,
         watchedCount: _watched.length,
         dismissedCount: _dismissed.length,
@@ -294,6 +309,10 @@ class _AppShellState extends State<AppShell> {
         },
         onPreferredGenresChanged: (value) {
           setState(() => _preferredGenres = value);
+          _persistPreferences();
+        },
+        onHideKidsFamilyAnimationChanged: (value) {
+          setState(() => _hideKidsFamilyAnimation = value);
           _persistPreferences();
         },
         onCompletedOnlyChanged: (value) {
@@ -363,6 +382,7 @@ class DiscoverPage extends StatefulWidget {
     required this.region,
     required this.services,
     required this.preferredGenres,
+    required this.hideKidsFamilyAnimation,
     required this.completedOnly,
     required this.excludedIds,
     required this.onToggleSaved,
@@ -376,6 +396,7 @@ class DiscoverPage extends StatefulWidget {
   final String region;
   final Set<String> services;
   final Set<String> preferredGenres;
+  final bool hideKidsFamilyAnimation;
   final bool completedOnly;
   final Set<int> excludedIds;
   final ValueChanged<int> onToggleSaved;
@@ -399,7 +420,6 @@ class _DiscoverPageState extends State<DiscoverPage> {
   String _lastQuery = '';
   int _visibleResultCount = 5;
   final Set<int> _rejectedResultIds = <int>{};
-
 
   static const moods = <_MoodOption>[
     _MoodOption(
@@ -468,7 +488,8 @@ class _DiscoverPageState extends State<DiscoverPage> {
         _interpretation = recommendation.interpretation;
         _loading = false;
         if (_results.isEmpty) {
-          _error = 'We couldn\'t find a strong match for that yet. Try a broader search or choose Any service.';
+          _error =
+              'We couldn\'t find a strong match for that yet. Try a broader search or choose Any service.';
         }
       });
     } catch (error, stackTrace) {
@@ -526,7 +547,9 @@ class _DiscoverPageState extends State<DiscoverPage> {
   }
 
   Future<void> _refinePrompt(String instruction) async {
-    final base = _lastQuery.trim().isEmpty ? _controller.text.trim() : _lastQuery.trim();
+    final base = _lastQuery.trim().isEmpty
+        ? _controller.text.trim()
+        : _lastQuery.trim();
     if (base.isEmpty || _loading) return;
     _controller.text = '$base, $instruction';
     await _findFromPrompt();
@@ -545,9 +568,14 @@ class _DiscoverPageState extends State<DiscoverPage> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Browse by mood', style: Theme.of(sheetContext).textTheme.headlineSmall),
+              Text(
+                'Browse by mood',
+                style: Theme.of(sheetContext).textTheme.headlineSmall,
+              ),
               const SizedBox(height: 8),
-              const Text('Choose the feeling first. Your written request is not used in this mode.'),
+              const Text(
+                'Choose the feeling first. Your written request is not used in this mode.',
+              ),
               const SizedBox(height: 18),
               GridView.builder(
                 shrinkWrap: true,
@@ -573,10 +601,16 @@ class _DiscoverPageState extends State<DiscoverPage> {
                           end: Alignment.bottomRight,
                           colors: [
                             const Color(0xFF2B0B51),
-                            index.isEven ? const Color(0xFF160927) : const Color(0xFF25093B),
+                            index.isEven
+                                ? const Color(0xFF160927)
+                                : const Color(0xFF25093B),
                           ],
                         ),
-                        border: Border.all(color: const Color(0xFF8125E8).withValues(alpha: 0.55)),
+                        border: Border.all(
+                          color: const Color(
+                            0xFF8125E8,
+                          ).withValues(alpha: 0.55),
+                        ),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -585,15 +619,35 @@ class _DiscoverPageState extends State<DiscoverPage> {
                             width: 42,
                             height: 42,
                             decoration: BoxDecoration(
-                              color: const Color(0xFF8125E8).withValues(alpha: 0.22),
+                              color: const Color(
+                                0xFF8125E8,
+                              ).withValues(alpha: 0.22),
                               borderRadius: BorderRadius.circular(14),
                             ),
-                            child: Icon(mood.icon, color: const Color(0xFFD7B8FF)),
+                            child: Icon(
+                              mood.icon,
+                              color: const Color(0xFFD7B8FF),
+                            ),
                           ),
                           const Spacer(),
-                          Text(mood.title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
+                          Text(
+                            mood.title,
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
                           const SizedBox(height: 4),
-                          Text(mood.subtitle, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, color: Color(0xFFB8AFC2), height: 1.25)),
+                          Text(
+                            mood.subtitle,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFFB8AFC2),
+                              height: 1.25,
+                            ),
+                          ),
                         ],
                       ),
                     ),
@@ -615,7 +669,12 @@ class _DiscoverPageState extends State<DiscoverPage> {
       isScrollControlled: true,
       builder: (sheetContext) => SafeArea(
         child: SingleChildScrollView(
-          padding: EdgeInsets.fromLTRB(20, 4, 20, 28 + MediaQuery.viewInsetsOf(sheetContext).bottom),
+          padding: EdgeInsets.fromLTRB(
+            20,
+            4,
+            20,
+            28 + MediaQuery.viewInsetsOf(sheetContext).bottom,
+          ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -664,7 +723,9 @@ class _DiscoverPageState extends State<DiscoverPage> {
       if (_resultMode == 'prompt') {
         await _findFromPrompt();
       } else {
-        final matches = moods.where((item) => item.title == _activeMood).toList();
+        final matches = moods
+            .where((item) => item.title == _activeMood)
+            .toList();
         if (matches.isNotEmpty) await _browseMood(matches.first);
       }
     } catch (_) {
@@ -711,7 +772,8 @@ class _DiscoverPageState extends State<DiscoverPage> {
                       padding: EdgeInsets.only(left: 15, right: 8, bottom: 48),
                       child: Icon(Icons.chat_bubble_outline_rounded, size: 27),
                     ),
-                    hintText: 'A psychological thriller that has finished airing, with clever twists',
+                    hintText:
+                        'A psychological thriller that has finished airing, with clever twists',
                     filled: true,
                     fillColor: const Color(0xFF15111D),
                     contentPadding: const EdgeInsets.symmetric(
@@ -802,11 +864,17 @@ class _DiscoverPageState extends State<DiscoverPage> {
                     ),
                     leading: const CircleAvatar(
                       backgroundColor: Color(0xFFB34CFF),
-                      child: Icon(Icons.theater_comedy_outlined, color: Color(0xFFF7F5FB)),
+                      child: Icon(
+                        Icons.theater_comedy_outlined,
+                        color: Color(0xFFF7F5FB),
+                      ),
                     ),
                     title: const Text(
                       'Browse by mood',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w900,
+                      ),
                     ),
                     subtitle: const Text(
                       'Gripping, dark, funny, comforting or clever',
@@ -846,7 +914,9 @@ class _DiscoverPageState extends State<DiscoverPage> {
                               _resultMode == 'mood'
                                   ? 'Browsing by mood'
                                   : "Here's what I understood",
-                              style: const TextStyle(fontWeight: FontWeight.w800),
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w800,
+                              ),
                             ),
                           ],
                         ),
@@ -860,7 +930,9 @@ class _DiscoverPageState extends State<DiscoverPage> {
                                   visualDensity: VisualDensity.compact,
                                   label: Text(label),
                                   backgroundColor: const Color(0xFF231D34),
-                                  side: const BorderSide(color: Color(0xFF40365A)),
+                                  side: const BorderSide(
+                                    color: Color(0xFF40365A),
+                                  ),
                                 ),
                               )
                               .toList(),
@@ -873,9 +945,15 @@ class _DiscoverPageState extends State<DiscoverPage> {
                   const SizedBox(height: 14),
                   Row(
                     children: [
-                      const Text('Not quite?', style: TextStyle(fontWeight: FontWeight.w800)),
+                      const Text(
+                        'Not quite?',
+                        style: TextStyle(fontWeight: FontWeight.w800),
+                      ),
                       const SizedBox(width: 8),
-                      Text('Refine without starting over', style: Theme.of(context).textTheme.bodyMedium),
+                      Text(
+                        'Refine without starting over',
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
                     ],
                   ),
                   const SizedBox(height: 10),
@@ -883,10 +961,35 @@ class _DiscoverPageState extends State<DiscoverPage> {
                     spacing: 8,
                     runSpacing: 8,
                     children: [
-                      ActionChip(label: const Text('Funnier'), onPressed: _loading ? null : () => _refinePrompt('make it funnier')),
-                      ActionChip(label: const Text('Less dark'), onPressed: _loading ? null : () => _refinePrompt('less dark and nothing bleak')),
-                      ActionChip(label: const Text('Shorter'), onPressed: _loading ? null : () => _refinePrompt('short episodes, under 35 minutes')),
-                      ActionChip(label: const Text('More gripping'), onPressed: _loading ? null : () => _refinePrompt('more gripping and suspenseful')),
+                      ActionChip(
+                        label: const Text('Funnier'),
+                        onPressed: _loading
+                            ? null
+                            : () => _refinePrompt('make it funnier'),
+                      ),
+                      ActionChip(
+                        label: const Text('Less dark'),
+                        onPressed: _loading
+                            ? null
+                            : () =>
+                                  _refinePrompt('less dark and nothing bleak'),
+                      ),
+                      ActionChip(
+                        label: const Text('Shorter'),
+                        onPressed: _loading
+                            ? null
+                            : () => _refinePrompt(
+                                'short episodes, under 35 minutes',
+                              ),
+                      ),
+                      ActionChip(
+                        label: const Text('More gripping'),
+                        onPressed: _loading
+                            ? null
+                            : () => _refinePrompt(
+                                'more gripping and suspenseful',
+                              ),
+                      ),
                     ],
                   ),
                 ],
@@ -930,24 +1033,32 @@ class _DiscoverPageState extends State<DiscoverPage> {
                     ),
                   ),
                   const SizedBox(height: 18),
-                  ..._results.take(_visibleResultCount).map(
-                    (show) => Padding(
-                      padding: const EdgeInsets.only(bottom: 16),
-                      child: ResultCard(
-                        show: show,
-                        region: widget.region,
-                        saved: widget.saved.contains(show.id),
-                        onToggleSaved: () => widget.onToggleSaved(show.id),
-                        onFeedback: (reason) => widget.onFeedback(show.id, reason),
+                  ..._results
+                      .take(_visibleResultCount)
+                      .map(
+                        (show) => Padding(
+                          padding: const EdgeInsets.only(bottom: 16),
+                          child: ResultCard(
+                            show: show,
+                            region: widget.region,
+                            saved: widget.saved.contains(show.id),
+                            onToggleSaved: () => widget.onToggleSaved(show.id),
+                            onFeedback: (reason) =>
+                                widget.onFeedback(show.id, reason),
+                          ),
+                        ),
                       ),
-                    ),
-                  ),
                   if (_results.length > _visibleResultCount) ...[
                     const SizedBox(height: 4),
                     FilledButton.icon(
-                      onPressed: () => setState(() => _visibleResultCount = (_visibleResultCount + 5).clamp(0, _results.length)),
+                      onPressed: () => setState(
+                        () => _visibleResultCount = (_visibleResultCount + 5)
+                            .clamp(0, _results.length),
+                      ),
                       icon: const Icon(Icons.add_rounded),
-                      label: Text('Show ${(_results.length - _visibleResultCount).clamp(0, 5)} more options'),
+                      label: Text(
+                        'Show ${(_results.length - _visibleResultCount).clamp(0, 5)} more options',
+                      ),
                     ),
                     const SizedBox(height: 10),
                   ],
@@ -991,19 +1102,54 @@ class _ResultsSkeleton extends StatelessWidget {
           ),
           child: Row(
             children: [
-              Container(width: 104, height: 150, decoration: BoxDecoration(color: const Color(0xFF24142F), borderRadius: BorderRadius.circular(16))),
+              Container(
+                width: 104,
+                height: 150,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF24142F),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+              ),
               const SizedBox(width: 16),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Container(height: 19, width: double.infinity, decoration: BoxDecoration(color: const Color(0xFF291735), borderRadius: BorderRadius.circular(8))),
+                    Container(
+                      height: 19,
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF291735),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
                     const SizedBox(height: 12),
-                    Container(height: 13, width: 130, decoration: BoxDecoration(color: const Color(0xFF21132B), borderRadius: BorderRadius.circular(8))),
+                    Container(
+                      height: 13,
+                      width: 130,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF21132B),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
                     const SizedBox(height: 20),
-                    Container(height: 12, width: double.infinity, decoration: BoxDecoration(color: const Color(0xFF21132B), borderRadius: BorderRadius.circular(8))),
+                    Container(
+                      height: 12,
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF21132B),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
                     const SizedBox(height: 8),
-                    Container(height: 12, width: 180, decoration: BoxDecoration(color: const Color(0xFF21132B), borderRadius: BorderRadius.circular(8))),
+                    Container(
+                      height: 12,
+                      width: 180,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF21132B),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -1087,14 +1233,20 @@ class _ConciergePanel extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(26, 28, 26, 26),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(32),
-        border: Border.all(color: const Color(0xFF8125E8).withValues(alpha: 0.65)),
+        border: Border.all(
+          color: const Color(0xFF8125E8).withValues(alpha: 0.65),
+        ),
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [Color(0xFF2B0B51), Color(0xFF160927), Color(0xFF050309)],
         ),
         boxShadow: const [
-          BoxShadow(color: Color(0x338125E8), blurRadius: 30, offset: Offset(0, 14)),
+          BoxShadow(
+            color: Color(0x338125E8),
+            blurRadius: 30,
+            offset: Offset(0, 14),
+          ),
         ],
       ),
       child: Stack(
@@ -1104,7 +1256,11 @@ class _ConciergePanel extends StatelessWidget {
             bottom: -28,
             child: Opacity(
               opacity: 0.11,
-              child: Image.asset('assets/brand/ffs_icon.png', width: 190, height: 190),
+              child: Image.asset(
+                'assets/brand/ffs_icon.png',
+                width: 190,
+                height: 190,
+              ),
             ),
           ),
           Column(
@@ -1151,7 +1307,11 @@ class _ConciergePanel extends StatelessWidget {
               SizedBox(height: 18),
               Text(
                 'Browse a mood for instant inspiration, or describe your perfect watch for precise, explainable picks.',
-                style: TextStyle(color: Color(0xFFC9BED5), fontSize: 16, height: 1.45),
+                style: TextStyle(
+                  color: Color(0xFFC9BED5),
+                  fontSize: 16,
+                  height: 1.45,
+                ),
               ),
             ],
           ),
@@ -1203,7 +1363,13 @@ class ResultCard extends StatelessWidget {
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(26),
               border: Border.all(color: const Color(0xFF2C153D)),
-              boxShadow: const [BoxShadow(color: Color(0x22000000), blurRadius: 18, offset: Offset(0, 10))],
+              boxShadow: const [
+                BoxShadow(
+                  color: Color(0x22000000),
+                  blurRadius: 18,
+                  offset: Offset(0, 10),
+                ),
+              ],
             ),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1217,8 +1383,25 @@ class ResultCard extends StatelessWidget {
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Expanded(child: Text(show.title, style: const TextStyle(fontSize: 21, fontWeight: FontWeight.w900, height: 1.12))),
-                          IconButton(onPressed: onToggleSaved, visualDensity: VisualDensity.compact, icon: Icon(saved ? Icons.bookmark_rounded : Icons.bookmark_border_rounded)),
+                          Expanded(
+                            child: Text(
+                              show.title,
+                              style: const TextStyle(
+                                fontSize: 21,
+                                fontWeight: FontWeight.w900,
+                                height: 1.12,
+                              ),
+                            ),
+                          ),
+                          IconButton(
+                            onPressed: onToggleSaved,
+                            visualDensity: VisualDensity.compact,
+                            icon: Icon(
+                              saved
+                                  ? Icons.bookmark_rounded
+                                  : Icons.bookmark_border_rounded,
+                            ),
+                          ),
                         ],
                       ),
                       const SizedBox(height: 5),
@@ -1227,20 +1410,41 @@ class ResultCard extends StatelessWidget {
                         runSpacing: 8,
                         children: [
                           if (show.confidence > 0)
-                            _MetaPill(icon: Icons.auto_awesome_rounded, label: '${show.confidence}% match', accent: true),
+                            _MetaPill(
+                              icon: Icons.auto_awesome_rounded,
+                              label: '${show.confidence}% match',
+                              accent: true,
+                            ),
                           if (show.rating > 0)
-                            _MetaPill(icon: Icons.star_rounded, label: '${show.rating}'),
+                            _MetaPill(
+                              icon: Icons.star_rounded,
+                              label: '${show.rating}',
+                            ),
                         ],
                       ),
                       const SizedBox(height: 10),
-                      Text([
-                        if (show.year > 0) '${show.year}',
-                        if (show.seasons > 0) '${show.seasons} seasons',
-                        if (show.runtime > 0) '${show.runtime} min',
-                      ].join(' · '), style: const TextStyle(color: Color(0xFF9F94A8), fontSize: 13)),
+                      Text(
+                        [
+                          if (show.year > 0) '${show.year}',
+                          if (show.seasons > 0) '${show.seasons} seasons',
+                          if (show.runtime > 0) '${show.runtime} min',
+                        ].join(' · '),
+                        style: const TextStyle(
+                          color: Color(0xFF9F94A8),
+                          fontSize: 13,
+                        ),
+                      ),
                       if (reasons.isNotEmpty) ...[
                         const SizedBox(height: 13),
-                        const Text('WHY IT MATCHES', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 1.2, color: Color(0xFFD7B8FF))),
+                        const Text(
+                          'WHY IT MATCHES',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 1.2,
+                            color: Color(0xFFD7B8FF),
+                          ),
+                        ),
                         const SizedBox(height: 7),
                         for (final reason in reasons)
                           Padding(
@@ -1248,22 +1452,55 @@ class ResultCard extends StatelessWidget {
                             child: Row(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Icon(Icons.check_circle_rounded, size: 15, color: Color(0xFFB34CFF)),
+                                const Icon(
+                                  Icons.check_circle_rounded,
+                                  size: 15,
+                                  color: Color(0xFFB34CFF),
+                                ),
                                 const SizedBox(width: 6),
-                                Expanded(child: Text(reason, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, color: Color(0xFFC5BBCB)))),
+                                Expanded(
+                                  child: Text(
+                                    reason,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      color: Color(0xFFC5BBCB),
+                                    ),
+                                  ),
+                                ),
                               ],
                             ),
                           ),
                       ] else ...[
                         const SizedBox(height: 12),
-                        Text(show.summary, maxLines: 3, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFFAAA0B0), height: 1.4, fontSize: 13)),
+                        Text(
+                          show.summary,
+                          maxLines: 3,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Color(0xFFAAA0B0),
+                            height: 1.4,
+                            fontSize: 13,
+                          ),
+                        ),
                       ],
                       const SizedBox(height: 8),
                       const Row(
                         children: [
-                          Text('View details', style: TextStyle(color: Color(0xFFD7B8FF), fontWeight: FontWeight.w800)),
+                          Text(
+                            'View details',
+                            style: TextStyle(
+                              color: Color(0xFFD7B8FF),
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
                           SizedBox(width: 4),
-                          Icon(Icons.arrow_forward_rounded, size: 17, color: Color(0xFFD7B8FF)),
+                          Icon(
+                            Icons.arrow_forward_rounded,
+                            size: 17,
+                            color: Color(0xFFD7B8FF),
+                          ),
                         ],
                       ),
                     ],
@@ -1279,7 +1516,11 @@ class ResultCard extends StatelessWidget {
 }
 
 class _MetaPill extends StatelessWidget {
-  const _MetaPill({required this.icon, required this.label, this.accent = false});
+  const _MetaPill({
+    required this.icon,
+    required this.label,
+    this.accent = false,
+  });
   final IconData icon;
   final String label;
   final bool accent;
@@ -1289,11 +1530,29 @@ class _MetaPill extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
       decoration: BoxDecoration(
-        color: accent ? const Color(0xFF8125E8).withValues(alpha: 0.20) : const Color(0xFF1B1023),
+        color: accent
+            ? const Color(0xFF8125E8).withValues(alpha: 0.20)
+            : const Color(0xFF1B1023),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: accent ? const Color(0xFF8125E8) : const Color(0xFF33203E)),
+        border: Border.all(
+          color: accent ? const Color(0xFF8125E8) : const Color(0xFF33203E),
+        ),
       ),
-      child: Row(mainAxisSize: MainAxisSize.min, children: [Icon(icon, size: 14, color: accent ? const Color(0xFFD7B8FF) : const Color(0xFFFFCC5C)), const SizedBox(width: 4), Text(label, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800))]),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            icon,
+            size: 14,
+            color: accent ? const Color(0xFFD7B8FF) : const Color(0xFFFFCC5C),
+          ),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -1342,12 +1601,20 @@ class _ShowDetailPageState extends State<ShowDetailPage> {
   Future<void> _sendShowFeedback(String reason) async {
     try {
       await widget.onLocalFeedback(reason);
-      await _api.sendFeedback(type: 'show', reason: reason, showId: widget.show.id);
+      await _api.sendFeedback(
+        type: 'show',
+        reason: reason,
+        showId: widget.show.id,
+      );
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Saved: $reason')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Saved: $reason')));
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Feedback could not be saved.')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Feedback could not be saved.')),
+      );
     }
   }
 
@@ -1378,7 +1645,10 @@ class _ShowDetailPageState extends State<ShowDetailPage> {
       _optionsError = null;
     });
     try {
-      final options = await _api.watchOptions(showId: widget.show.id, region: widget.region);
+      final options = await _api.watchOptions(
+        showId: widget.show.id,
+        region: widget.region,
+      );
       if (!mounted) return;
       setState(() {
         _options = options;
@@ -1407,9 +1677,13 @@ class _ShowDetailPageState extends State<ShowDetailPage> {
       );
       if (!mounted) return;
       setState(() {
-        _vibeResults = result.shows.where((item) => item.id != widget.show.id).take(5).toList();
+        _vibeResults = result.shows
+            .where((item) => item.id != widget.show.id)
+            .take(5)
+            .toList();
         _loadingVibe = false;
-        if (_vibeResults.isEmpty) _vibeError = 'No strong matches found for this direction.';
+        if (_vibeResults.isEmpty)
+          _vibeError = 'No strong matches found for this direction.';
       });
     } catch (error) {
       if (!mounted) return;
@@ -1447,7 +1721,9 @@ class _ShowDetailPageState extends State<ShowDetailPage> {
       if (await launchUrl(uri, mode: LaunchMode.externalApplication)) return;
     }
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${provider.name} could not be opened.')));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('${provider.name} could not be opened.')),
+    );
   }
 
   Future<void> _shareShow(BuildContext shareContext) async {
@@ -1464,7 +1740,9 @@ class _ShowDetailPageState extends State<ShowDetailPage> {
         text: details,
         title: 'Share ${show.title}',
         subject: 'You might like ${show.title}',
-        sharePositionOrigin: box == null ? null : box.localToGlobal(Offset.zero) & box.size,
+        sharePositionOrigin: box == null
+            ? null
+            : box.localToGlobal(Offset.zero) & box.size,
       ),
     );
   }
@@ -1478,17 +1756,19 @@ class _ShowDetailPageState extends State<ShowDetailPage> {
     return parts.join(' · ');
   }
 
-  Map<String, List<WatchProvider>> _providerGroups(List<WatchProvider> providers) {
+  Map<String, List<WatchProvider>> _providerGroups(
+    List<WatchProvider> providers,
+  ) {
     final groups = <String, List<WatchProvider>>{};
     for (final provider in providers) {
       final raw = provider.type.toLowerCase();
       final label = raw.contains('free')
           ? 'Free'
           : raw.contains('rent')
-              ? 'Rent'
-              : raw.contains('buy') || raw.contains('purchase')
-                  ? 'Buy'
-                  : 'Stream';
+          ? 'Rent'
+          : raw.contains('buy') || raw.contains('purchase')
+          ? 'Buy'
+          : 'Stream';
       groups.putIfAbsent(label, () => <WatchProvider>[]).add(provider);
     }
     return groups;
@@ -1511,7 +1791,9 @@ class _ShowDetailPageState extends State<ShowDetailPage> {
   Widget build(BuildContext context) {
     final show = widget.show;
     final details = _details;
-    final providerGroups = _options == null ? <String, List<WatchProvider>>{} : _providerGroups(_options!.providers);
+    final providerGroups = _options == null
+        ? <String, List<WatchProvider>>{}
+        : _providerGroups(_options!.providers);
 
     return Scaffold(
       body: CustomScrollView(
@@ -1534,7 +1816,11 @@ class _ShowDetailPageState extends State<ShowDetailPage> {
                   widget.onToggleSaved();
                   setState(() => _saved = !_saved);
                 },
-                icon: Icon(_saved ? Icons.bookmark_rounded : Icons.bookmark_border_rounded),
+                icon: Icon(
+                  _saved
+                      ? Icons.bookmark_rounded
+                      : Icons.bookmark_border_rounded,
+                ),
               ),
             ],
             flexibleSpace: FlexibleSpaceBar(
@@ -1544,14 +1830,19 @@ class _ShowDetailPageState extends State<ShowDetailPage> {
                   Image.network(
                     show.poster,
                     fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => const ColoredBox(color: Color(0xFF160927)),
+                    errorBuilder: (_, __, ___) =>
+                        const ColoredBox(color: Color(0xFF160927)),
                   ),
                   const DecoratedBox(
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         begin: Alignment.topCenter,
                         end: Alignment.bottomCenter,
-                        colors: [Color(0x22050309), Color(0x88050309), Color(0xFF050309)],
+                        colors: [
+                          Color(0x22050309),
+                          Color(0x88050309),
+                          Color(0xFF050309),
+                        ],
                         stops: [0.25, 0.68, 1],
                       ),
                     ),
@@ -1566,18 +1857,36 @@ class _ShowDetailPageState extends State<ShowDetailPage> {
               children: [
                 const Text(
                   'FOR FLICK SAKES... THIS ONE MIGHT BE IT.',
-                  style: TextStyle(color: Color(0xFFD7B8FF), fontSize: 11, fontWeight: FontWeight.w900, letterSpacing: 1.25),
+                  style: TextStyle(
+                    color: Color(0xFFD7B8FF),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 1.25,
+                  ),
                 ),
                 const SizedBox(height: 10),
-                Text(show.title, style: Theme.of(context).textTheme.headlineLarge),
+                Text(
+                  show.title,
+                  style: Theme.of(context).textTheme.headlineLarge,
+                ),
                 const SizedBox(height: 12),
                 Wrap(
                   spacing: 8,
                   runSpacing: 8,
                   children: [
-                    if (show.confidence > 0) _MetaPill(icon: Icons.auto_awesome_rounded, label: '${show.confidence}% match', accent: true),
-                    if (show.rating > 0) _MetaPill(icon: Icons.star_rounded, label: '${show.rating}/10'),
-                    if (show.status.isNotEmpty) _MetaPill(icon: Icons.flag_outlined, label: show.status),
+                    if (show.confidence > 0)
+                      _MetaPill(
+                        icon: Icons.auto_awesome_rounded,
+                        label: '${show.confidence}% match',
+                        accent: true,
+                      ),
+                    if (show.rating > 0)
+                      _MetaPill(
+                        icon: Icons.star_rounded,
+                        label: '${show.rating}/10',
+                      ),
+                    if (show.status.isNotEmpty)
+                      _MetaPill(icon: Icons.flag_outlined, label: show.status),
                   ],
                 ),
                 const SizedBox(height: 16),
@@ -1586,19 +1895,39 @@ class _ShowDetailPageState extends State<ShowDetailPage> {
                     if (show.year > 0) '${show.year}',
                     if (show.seasons > 0) '${show.seasons} seasons',
                     if (show.runtime > 0) '${show.runtime} min episodes',
-                    if (details != null && details.episodeCount > 0) '${details.episodeCount} episodes',
+                    if (details != null && details.episodeCount > 0)
+                      '${details.episodeCount} episodes',
                   ].join(' · '),
-                  style: const TextStyle(color: Color(0xFFAAA0B0), fontSize: 14),
+                  style: const TextStyle(
+                    color: Color(0xFFAAA0B0),
+                    fontSize: 14,
+                  ),
                 ),
-                if (details != null && (details.network.isNotEmpty || details.language.isNotEmpty || details.type.isNotEmpty)) ...[
+                if (details != null &&
+                    (details.network.isNotEmpty ||
+                        details.language.isNotEmpty ||
+                        details.type.isNotEmpty)) ...[
                   const SizedBox(height: 9),
                   Text(
-                    [details.network, details.language, details.type].where((item) => item.isNotEmpty).join(' · '),
-                    style: const TextStyle(color: Color(0xFF857E8D), fontSize: 13),
+                    [
+                      details.network,
+                      details.language,
+                      details.type,
+                    ].where((item) => item.isNotEmpty).join(' · '),
+                    style: const TextStyle(
+                      color: Color(0xFF857E8D),
+                      fontSize: 13,
+                    ),
                   ),
                 ],
                 const SizedBox(height: 18),
-                Wrap(spacing: 8, runSpacing: 8, children: show.genres.map((genre) => Chip(label: Text(genre))).toList()),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: show.genres
+                      .map((genre) => Chip(label: Text(genre)))
+                      .toList(),
+                ),
                 const SizedBox(height: 26),
                 Row(
                   children: [
@@ -1608,7 +1937,11 @@ class _ShowDetailPageState extends State<ShowDetailPage> {
                           widget.onToggleSaved();
                           setState(() => _saved = !_saved);
                         },
-                        icon: Icon(_saved ? Icons.bookmark_rounded : Icons.bookmark_add_outlined),
+                        icon: Icon(
+                          _saved
+                              ? Icons.bookmark_rounded
+                              : Icons.bookmark_add_outlined,
+                        ),
                         label: Text(_saved ? 'Saved' : 'Save'),
                       ),
                     ),
@@ -1626,7 +1959,11 @@ class _ShowDetailPageState extends State<ShowDetailPage> {
                 ),
                 if (show.matchReasons.isNotEmpty) ...[
                   const SizedBox(height: 34),
-                  _sectionTitle(context, 'Why this matched', subtitle: 'The evidence behind this recommendation.'),
+                  _sectionTitle(
+                    context,
+                    'Why this matched',
+                    subtitle: 'The evidence behind this recommendation.',
+                  ),
                   const SizedBox(height: 14),
                   Container(
                     padding: const EdgeInsets.all(18),
@@ -1636,30 +1973,51 @@ class _ShowDetailPageState extends State<ShowDetailPage> {
                       border: Border.all(color: const Color(0xFF321747)),
                     ),
                     child: Column(
-                      children: show.matchReasons.map((reason) => Padding(
-                        padding: const EdgeInsets.only(bottom: 9),
-                        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                          const Icon(Icons.check_circle_rounded, color: Color(0xFFB34CFF), size: 19),
-                          const SizedBox(width: 9),
-                          Expanded(child: Text(reason)),
-                        ]),
-                      )).toList(),
+                      children: show.matchReasons
+                          .map(
+                            (reason) => Padding(
+                              padding: const EdgeInsets.only(bottom: 9),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Icon(
+                                    Icons.check_circle_rounded,
+                                    color: Color(0xFFB34CFF),
+                                    size: 19,
+                                  ),
+                                  const SizedBox(width: 9),
+                                  Expanded(child: Text(reason)),
+                                ],
+                              ),
+                            ),
+                          )
+                          .toList(),
                     ),
                   ),
                 ],
                 const SizedBox(height: 34),
                 _sectionTitle(context, 'About'),
                 const SizedBox(height: 12),
-                Text(show.summary, style: Theme.of(context).textTheme.bodyLarge),
+                Text(
+                  show.summary,
+                  style: Theme.of(context).textTheme.bodyLarge,
+                ),
                 if (_loadingDetails) ...[
                   const SizedBox(height: 28),
                   const LinearProgressIndicator(),
                 ] else if (_detailsError != null) ...[
                   const SizedBox(height: 20),
-                  Text(_detailsError!, style: const TextStyle(color: Color(0xFF8F8697))),
+                  Text(
+                    _detailsError!,
+                    style: const TextStyle(color: Color(0xFF8F8697)),
+                  ),
                 ] else if (details != null && details.cast.isNotEmpty) ...[
                   const SizedBox(height: 34),
-                  _sectionTitle(context, 'Cast', subtitle: 'Main cast from TVMaze.'),
+                  _sectionTitle(
+                    context,
+                    'Cast',
+                    subtitle: 'Main cast from TVMaze.',
+                  ),
                   const SizedBox(height: 14),
                   SizedBox(
                     height: 150,
@@ -1676,13 +2034,35 @@ class _ShowDetailPageState extends State<ShowDetailPage> {
                               CircleAvatar(
                                 radius: 38,
                                 backgroundColor: const Color(0xFF24142F),
-                                backgroundImage: member.imageUrl.isEmpty ? null : NetworkImage(member.imageUrl),
-                                child: member.imageUrl.isEmpty ? const Icon(Icons.person_outline_rounded) : null,
+                                backgroundImage: member.imageUrl.isEmpty
+                                    ? null
+                                    : NetworkImage(member.imageUrl),
+                                child: member.imageUrl.isEmpty
+                                    ? const Icon(Icons.person_outline_rounded)
+                                    : null,
                               ),
                               const SizedBox(height: 8),
-                              Text(member.name, maxLines: 1, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800)),
+                              Text(
+                                member.name,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
                               if (member.character.isNotEmpty)
-                                Text(member.character, maxLines: 1, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center, style: const TextStyle(fontSize: 10, color: Color(0xFF8F8697))),
+                                Text(
+                                  member.character,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(
+                                    fontSize: 10,
+                                    color: Color(0xFF8F8697),
+                                  ),
+                                ),
                             ],
                           ),
                         );
@@ -1694,18 +2074,42 @@ class _ShowDetailPageState extends State<ShowDetailPage> {
                 _sectionTitle(
                   context,
                   'Continue the vibe',
-                  subtitle: 'Use ${show.title} as the reference point, then steer the next picks.',
+                  subtitle:
+                      'Use ${show.title} as the reference point, then steer the next picks.',
                 ),
                 const SizedBox(height: 12),
                 Wrap(
                   spacing: 8,
                   runSpacing: 8,
                   children: [
-                    ChoiceChip(label: const Text('More like this'), selected: _vibeMode == 'same' && _vibeResults.isNotEmpty, onSelected: (_) => _continueVibe('same')),
-                    ChoiceChip(label: const Text('Lighter'), selected: _vibeMode == 'lighter' && _vibeResults.isNotEmpty, onSelected: (_) => _continueVibe('lighter')),
-                    ChoiceChip(label: const Text('More gripping'), selected: _vibeMode == 'gripping' && _vibeResults.isNotEmpty, onSelected: (_) => _continueVibe('gripping')),
-                    ChoiceChip(label: const Text('Shorter'), selected: _vibeMode == 'shorter' && _vibeResults.isNotEmpty, onSelected: (_) => _continueVibe('shorter')),
-                    ChoiceChip(label: const Text('Funnier'), selected: _vibeMode == 'funny' && _vibeResults.isNotEmpty, onSelected: (_) => _continueVibe('funny')),
+                    ChoiceChip(
+                      label: const Text('More like this'),
+                      selected: _vibeMode == 'same' && _vibeResults.isNotEmpty,
+                      onSelected: (_) => _continueVibe('same'),
+                    ),
+                    ChoiceChip(
+                      label: const Text('Lighter'),
+                      selected:
+                          _vibeMode == 'lighter' && _vibeResults.isNotEmpty,
+                      onSelected: (_) => _continueVibe('lighter'),
+                    ),
+                    ChoiceChip(
+                      label: const Text('More gripping'),
+                      selected:
+                          _vibeMode == 'gripping' && _vibeResults.isNotEmpty,
+                      onSelected: (_) => _continueVibe('gripping'),
+                    ),
+                    ChoiceChip(
+                      label: const Text('Shorter'),
+                      selected:
+                          _vibeMode == 'shorter' && _vibeResults.isNotEmpty,
+                      onSelected: (_) => _continueVibe('shorter'),
+                    ),
+                    ChoiceChip(
+                      label: const Text('Funnier'),
+                      selected: _vibeMode == 'funny' && _vibeResults.isNotEmpty,
+                      onSelected: (_) => _continueVibe('funny'),
+                    ),
                   ],
                 ),
                 if (_loadingVibe) ...[
@@ -1713,7 +2117,10 @@ class _ShowDetailPageState extends State<ShowDetailPage> {
                   const LinearProgressIndicator(),
                 ] else if (_vibeError != null) ...[
                   const SizedBox(height: 14),
-                  Text(_vibeError!, style: const TextStyle(color: Color(0xFF9F94A8))),
+                  Text(
+                    _vibeError!,
+                    style: const TextStyle(color: Color(0xFF9F94A8)),
+                  ),
                 ] else if (_vibeResults.isNotEmpty) ...[
                   const SizedBox(height: 16),
                   SizedBox(
@@ -1732,11 +2139,30 @@ class _ShowDetailPageState extends State<ShowDetailPage> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                _Poster(url: item.poster, width: 145, height: 190),
+                                _Poster(
+                                  url: item.poster,
+                                  width: 145,
+                                  height: 190,
+                                ),
                                 const SizedBox(height: 8),
-                                Text(item.title, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w900)),
+                                Text(
+                                  item.title,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                                ),
                                 if (item.matchReasons.isNotEmpty)
-                                  Text(item.matchReasons.first, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11, color: Color(0xFF9F94A8))),
+                                  Text(
+                                    item.matchReasons.first,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      color: Color(0xFF9F94A8),
+                                    ),
+                                  ),
                               ],
                             ),
                           ),
@@ -1752,43 +2178,99 @@ class _ShowDetailPageState extends State<ShowDetailPage> {
                   spacing: 8,
                   runSpacing: 8,
                   children: [
-                    for (final option in const <String>['Loved it', 'Not interested', 'Already watched', 'Wrong genre', 'Too dark', 'Too slow', 'Wrong service'])
-                      ActionChip(label: Text(option), onPressed: () => _sendShowFeedback(option)),
+                    for (final option in const <String>[
+                      'Loved it',
+                      'Not interested',
+                      'Already watched',
+                      'Wrong genre',
+                      'Too dark',
+                      'Too slow',
+                      'Wrong service',
+                    ])
+                      ActionChip(
+                        label: Text(option),
+                        onPressed: () => _sendShowFeedback(option),
+                      ),
                   ],
                 ),
                 const SizedBox(height: 34),
                 Row(
                   children: [
-                    Expanded(child: _sectionTitle(context, 'Where to watch', subtitle: 'Availability for ${widget.region}. Tap a service to open it.')),
-                    IconButton(tooltip: 'Refresh availability', onPressed: _loadingOptions ? null : _loadOptions, icon: const Icon(Icons.refresh_rounded)),
+                    Expanded(
+                      child: _sectionTitle(
+                        context,
+                        'Where to watch',
+                        subtitle:
+                            'Availability for ${widget.region}. Tap a service to open it.',
+                      ),
+                    ),
+                    if (_options != null && _options!.providers.isNotEmpty)
+                      IconButton(
+                        tooltip: 'Refresh availability',
+                        onPressed: _loadingOptions ? null : _loadOptions,
+                        icon: const Icon(Icons.refresh_rounded),
+                      ),
                   ],
                 ),
                 const SizedBox(height: 14),
                 if (_loadingOptions)
-                  const Padding(padding: EdgeInsets.symmetric(vertical: 24), child: Center(child: CircularProgressIndicator()))
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 24),
+                    child: Center(child: CircularProgressIndicator()),
+                  )
                 else if (_optionsError != null)
-                  _AvailabilityMessage(icon: Icons.cloud_off_rounded, message: _optionsError!, actionLabel: 'Try again', onAction: _loadOptions)
+                  _AvailabilityMessage(
+                    icon: Icons.cloud_off_rounded,
+                    message: _optionsError!,
+                    actionLabel: 'Try again',
+                    onAction: _loadOptions,
+                  )
                 else if (_options == null || _options!.providers.isEmpty)
-                  _AvailabilityMessage(icon: Icons.tv_off_outlined, message: _options?.message ?? 'No verified streaming services are available for this region.', actionLabel: 'Refresh', onAction: _loadOptions)
+                  _AvailabilityMessage(
+                    icon: Icons.tv_off_outlined,
+                    message:
+                        _options?.message ??
+                        'No verified streaming services are available for this region.',
+                    actionLabel: 'Refresh',
+                    onAction: _loadOptions,
+                  )
                 else
                   for (final entry in providerGroups.entries) ...[
                     Padding(
                       padding: const EdgeInsets.only(top: 10, bottom: 8),
-                      child: Text(entry.key.toUpperCase(), style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w900, letterSpacing: 1.2, color: Color(0xFFD7B8FF))),
-                    ),
-                    ...entry.value.map((provider) => Card(
-                      margin: const EdgeInsets.only(bottom: 10),
-                      child: ListTile(
-                        leading: CircleAvatar(
-                          backgroundColor: const Color(0xFF2A2340),
-                          child: Text(provider.name.isEmpty ? '?' : provider.name.characters.first.toUpperCase(), style: const TextStyle(fontWeight: FontWeight.w900)),
+                      child: Text(
+                        entry.key.toUpperCase(),
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 1.2,
+                          color: Color(0xFFD7B8FF),
                         ),
-                        title: Text(provider.name),
-                        subtitle: Text(_providerSubtitle(provider)),
-                        trailing: const Icon(Icons.open_in_new_rounded),
-                        onTap: () => _openProvider(provider),
                       ),
-                    )),
+                    ),
+                    ...entry.value.map(
+                      (provider) => Card(
+                        margin: const EdgeInsets.only(bottom: 10),
+                        child: ListTile(
+                          leading: CircleAvatar(
+                            backgroundColor: const Color(0xFF2A2340),
+                            child: Text(
+                              provider.name.isEmpty
+                                  ? '?'
+                                  : provider.name.characters.first
+                                        .toUpperCase(),
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                          ),
+                          title: Text(provider.name),
+                          subtitle: Text(_providerSubtitle(provider)),
+                          trailing: const Icon(Icons.open_in_new_rounded),
+                          onTap: () => _openProvider(provider),
+                        ),
+                      ),
+                    ),
                   ],
               ],
             ),
@@ -1870,7 +2352,6 @@ class _Poster extends StatelessWidget {
   }
 }
 
-
 class ForYouPage extends StatefulWidget {
   const ForYouPage({
     required this.languageCode,
@@ -1881,6 +2362,7 @@ class ForYouPage extends StatefulWidget {
     required this.region,
     required this.services,
     required this.preferredGenres,
+    required this.hideKidsFamilyAnimation,
     required this.completedOnly,
     required this.onToggleSaved,
     required this.onFeedback,
@@ -1896,6 +2378,7 @@ class ForYouPage extends StatefulWidget {
   final String region;
   final Set<String> services;
   final Set<String> preferredGenres;
+  final bool hideKidsFamilyAnimation;
   final bool completedOnly;
   final ValueChanged<int> onToggleSaved;
   final Future<void> Function(int showId, String reason) onFeedback;
@@ -1918,7 +2401,7 @@ class _ForYouPageState extends State<ForYouPage> {
     final dismissed = widget.dismissed.toList()..sort();
     final services = widget.services.toList()..sort();
     final preferredGenres = widget.preferredGenres.toList()..sort();
-    return '${saved.join(',')}|${watched.join(',')}|${dismissed.join(',')}|${widget.region}|${services.join(',')}|${preferredGenres.join(',')}|${widget.completedOnly}';
+    return '${saved.join(',')}|${watched.join(',')}|${dismissed.join(',')}|${widget.region}|${services.join(',')}|${preferredGenres.join(',')}|${widget.hideKidsFamilyAnimation}|${widget.completedOnly}';
   }
 
   @override
@@ -1937,7 +2420,10 @@ class _ForYouPageState extends State<ForYouPage> {
 
   List<ShowItem> get _positiveShows {
     final ids = <int>{...widget.saved, ...widget.watched};
-    return ids.map((id) => widget.knownShows[id]).whereType<ShowItem>().toList();
+    return ids
+        .map((id) => widget.knownShows[id])
+        .whereType<ShowItem>()
+        .toList();
   }
 
   Future<RecommendationResult> _recommend(String query, Set<int> excluded) {
@@ -1972,8 +2458,13 @@ class _ForYouPageState extends State<ForYouPage> {
 
     try {
       final excluded = <int>{...widget.dismissed, ...widget.watched};
-      final savedShows = positives.where((show) => widget.saved.contains(show.id)).toList();
-      final anchors = <ShowItem>[...savedShows, ...positives.where((show) => !widget.saved.contains(show.id))];
+      final savedShows = positives
+          .where((show) => widget.saved.contains(show.id))
+          .toList();
+      final anchors = <ShowItem>[
+        ...savedShows,
+        ...positives.where((show) => !widget.saved.contains(show.id)),
+      ];
       final ShowItem? anchor = anchors.isNotEmpty ? anchors.first : null;
       final ShowItem? secondAnchor = anchors.length > 1 ? anchors[1] : null;
 
@@ -1995,67 +2486,119 @@ class _ForYouPageState extends State<ForYouPage> {
       final genreNames = topGenres.take(3).map((entry) => entry.key).toList();
 
       final requestSpecs = <({String key, String query})>[
-        if (anchor != null) (key: 'anchor1', query: 'Something like ${anchor.title}'),
-        if (secondAnchor != null) (key: 'anchor2', query: 'Something like ${secondAnchor.title}'),
+        if (anchor != null)
+          (key: 'anchor1', query: 'Something like ${anchor.title}'),
+        if (secondAnchor != null)
+          (key: 'anchor2', query: 'Something like ${secondAnchor.title}'),
         if (genreNames.isNotEmpty)
-          (key: 'taste', query: 'A highly rated ${genreNames.take(2).join(' ')} series'),
+          (
+            key: 'taste',
+            query: 'A highly rated ${genreNames.take(2).join(' ')} series',
+          ),
         if (genreNames.length >= 2)
-          (key: 'blend', query: 'A ${genreNames[0]} ${genreNames[1]} series with a different feel'),
-        (key: 'easy', query: 'Something easy to watch with episodes under 40 minutes'),
+          (
+            key: 'blend',
+            query:
+                'A ${genreNames[0]} ${genreNames[1]} series with a different feel',
+          ),
+        (
+          key: 'easy',
+          query: genreNames.isEmpty
+              ? 'Something easy to watch with episodes under 40 minutes'
+              : 'An easy to watch ${genreNames.take(2).join(' ')} series with episodes under 40 minutes',
+        ),
       ];
       final results = await Future.wait(
         requestSpecs.map((spec) => _recommend(spec.query, excluded)),
       );
       final byKey = <String, RecommendationResult>{
-        for (var i = 0; i < requestSpecs.length; i++) requestSpecs[i].key: results[i],
+        for (var i = 0; i < requestSpecs.length; i++)
+          requestSpecs[i].key: results[i],
       };
 
       final used = <int>{...excluded, ...positives.map((show) => show.id)};
-      List<ShowItem> uniqueFrom(String key, {int take = 6}) {
+      List<ShowItem> uniqueFrom(String key, {int take = 6, ShowItem? anchor}) {
         final output = <ShowItem>[];
+
         for (final show in byKey[key]?.shows ?? const <ShowItem>[]) {
+          final lowerGenres = show.genres
+              .map((genre) => genre.toLowerCase())
+              .toSet();
+
+          if (widget.hideKidsFamilyAnimation &&
+              lowerGenres.contains('animation') &&
+              lowerGenres.contains('family')) {
+            continue;
+          }
+          if (anchor != null) {
+            final anchorGenres = anchor.genres
+                .map((genre) => genre.toLowerCase())
+                .toSet();
+            final showGenres = show.genres
+                .map((genre) => genre.toLowerCase())
+                .toSet();
+
+            final overlap = showGenres.where(anchorGenres.contains).length;
+
+            if (overlap == 0) continue;
+          }
+
           if (used.add(show.id)) output.add(show);
           if (output.length >= take) break;
         }
+
         return output;
       }
 
       final sections = <_ForYouSection>[];
       if (anchor != null) {
-        sections.add(_ForYouSection(
-          title: 'Because you ${widget.saved.contains(anchor.id) ? 'saved' : 'watched'} ${anchor.title}',
-          subtitle: 'A close match to something you deliberately chose.',
-          shows: uniqueFrom('anchor1'),
-        ));
+        sections.add(
+          _ForYouSection(
+            title:
+                'Because you ${widget.saved.contains(anchor.id) ? 'saved' : 'watched'} ${anchor.title}',
+            subtitle: 'A close match to something you deliberately chose.',
+            shows: uniqueFrom('anchor1', anchor: anchor),
+          ),
+        );
       }
       if (secondAnchor != null) {
-        sections.add(_ForYouSection(
-          title: 'Inspired by ${secondAnchor.title}',
-          subtitle: 'A second taste signal keeps your recommendations from becoming repetitive.',
-          shows: uniqueFrom('anchor2'),
-        ));
+        sections.add(
+          _ForYouSection(
+            title: 'Inspired by ${secondAnchor.title}',
+            subtitle:
+                'A second taste signal keeps your recommendations from becoming repetitive.',
+            shows: uniqueFrom('anchor2', anchor: secondAnchor),
+          ),
+        );
       }
       if (genreNames.isNotEmpty) {
-        sections.add(_ForYouSection(
-          title: 'Your ${genreNames.take(2).join(' + ')} lane',
-          subtitle: widget.preferredGenres.isEmpty
-              ? 'Learned from the shows you save and watch.'
-              : 'Blending the genres you chose in Profile with what you actually watch.',
-          shows: uniqueFrom('taste'),
-        ));
+        sections.add(
+          _ForYouSection(
+            title: 'Your ${genreNames.take(2).join(' + ')} lane',
+            subtitle: widget.preferredGenres.isEmpty
+                ? 'Learned from the shows you save and watch.'
+                : 'Blending the genres you chose in Profile with what you actually watch.',
+            shows: uniqueFrom('taste'),
+          ),
+        );
       }
       if (genreNames.length >= 2) {
-        sections.add(_ForYouSection(
-          title: 'A different side of your taste',
-          subtitle: 'Familiar ingredients, but deliberately less repetitive.',
-          shows: uniqueFrom('blend'),
-        ));
+        sections.add(
+          _ForYouSection(
+            title: 'A different side of your taste',
+            subtitle: 'Familiar ingredients, but deliberately less repetitive.',
+            shows: uniqueFrom('blend'),
+          ),
+        );
       }
-      sections.add(_ForYouSection(
-        title: 'Easy watches tonight',
-        subtitle: 'Lower-friction picks that still respect your services and taste.',
-        shows: uniqueFrom('easy'),
-      ));
+      sections.add(
+        _ForYouSection(
+          title: 'Easy watches tonight',
+          subtitle:
+              'Lower-friction picks that still respect your services and taste.',
+          shows: uniqueFrom('easy'),
+        ),
+      );
 
       final allShows = sections.expand((section) => section.shows);
       await widget.onShowsSeen(allShows);
@@ -2063,7 +2606,9 @@ class _ForYouPageState extends State<ForYouPage> {
       if (!mounted) return;
       setState(() {
         _signature = signature;
-        _sections = sections.where((section) => section.shows.isNotEmpty).toList();
+        _sections = sections
+            .where((section) => section.shows.isNotEmpty)
+            .toList();
         _loading = false;
       });
     } catch (error) {
@@ -2071,7 +2616,8 @@ class _ForYouPageState extends State<ForYouPage> {
       setState(() {
         _signature = signature;
         _loading = false;
-        _error = 'Recommendations are taking a little longer right now. Please try again.';
+        _error =
+            'Recommendations are taking a little longer right now. Please try again.';
       });
     }
   }
@@ -2085,11 +2631,18 @@ class _ForYouPageState extends State<ForYouPage> {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(24, 28, 24, 120),
           children: [
-            Text(_t(widget.languageCode, 'forYou'), style: Theme.of(context).textTheme.headlineLarge),
+            Text(
+              _t(widget.languageCode, 'forYou'),
+              style: Theme.of(context).textTheme.headlineLarge,
+            ),
             const SizedBox(height: 8),
             Text(
               _t(widget.languageCode, 'forYouTag'),
-              style: TextStyle(color: Color(0xFFD7B8FF), fontSize: 16, fontWeight: FontWeight.w700),
+              style: TextStyle(
+                color: Color(0xFFD7B8FF),
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+              ),
             ),
             const SizedBox(height: 10),
             const Text(
@@ -2106,9 +2659,19 @@ class _ForYouPageState extends State<ForYouPage> {
                 ),
                 child: const Column(
                   children: [
-                    Icon(Icons.favorite_outline_rounded, size: 46, color: Color(0xFFD7B8FF)),
+                    Icon(
+                      Icons.favorite_outline_rounded,
+                      size: 46,
+                      color: Color(0xFFD7B8FF),
+                    ),
                     SizedBox(height: 14),
-                    Text('Teach us your taste.', style: TextStyle(fontSize: 21, fontWeight: FontWeight.w900)),
+                    Text(
+                      'Teach us your taste.',
+                      style: TextStyle(
+                        fontSize: 21,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
                     SizedBox(height: 8),
                     Text(
                       'Save a show, mark something as watched, or tell us you loved it. Your personalised picks will build from those real signals.',
@@ -2186,7 +2749,10 @@ class _ForYouSectionView extends StatelessWidget {
       children: [
         Text(section.title, style: Theme.of(context).textTheme.titleLarge),
         const SizedBox(height: 5),
-        Text(section.subtitle, style: const TextStyle(color: Color(0xFF9F94A8))),
+        Text(
+          section.subtitle,
+          style: const TextStyle(color: Color(0xFF9F94A8)),
+        ),
         const SizedBox(height: 14),
         for (final show in section.shows.take(3)) ...[
           ResultCard(
@@ -2254,8 +2820,9 @@ class WatchlistPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final shows = saved.map((id) => knownShows[id]).whereType<ShowItem>().toList()
-      ..sort((a, b) => a.title.compareTo(b.title));
+    final shows =
+        saved.map((id) => knownShows[id]).whereType<ShowItem>().toList()
+          ..sort((a, b) => a.title.compareTo(b.title));
 
     return SafeArea(
       child: Padding(
@@ -2263,9 +2830,16 @@ class WatchlistPage extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(_t(languageCode, 'watchlist'), style: Theme.of(context).textTheme.headlineLarge),
+            Text(
+              _t(languageCode, 'watchlist'),
+              style: Theme.of(context).textTheme.headlineLarge,
+            ),
             const SizedBox(height: 10),
-            Text(saved.isEmpty ? 'Save a recommendation and it will appear here.' : '${saved.length} saved ${saved.length == 1 ? 'title' : 'titles'}'),
+            Text(
+              saved.isEmpty
+                  ? 'Save a recommendation and it will appear here.'
+                  : '${saved.length} saved ${saved.length == 1 ? 'title' : 'titles'}',
+            ),
             const SizedBox(height: 22),
             if (saved.isEmpty)
               Expanded(
@@ -2273,11 +2847,25 @@ class WatchlistPage extends StatelessWidget {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.bookmark_border_rounded, size: 52, color: Color(0xFFD7B8FF)),
+                      Icon(
+                        Icons.bookmark_border_rounded,
+                        size: 52,
+                        color: Color(0xFFD7B8FF),
+                      ),
                       SizedBox(height: 14),
-                      Text(_t(languageCode, 'watchlistEmpty'), style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800), textAlign: TextAlign.center),
+                      Text(
+                        _t(languageCode, 'watchlistEmpty'),
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w800,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
                       SizedBox(height: 8),
-                      Text('Save picks from Discover to keep them here.', textAlign: TextAlign.center),
+                      Text(
+                        'Save picks from Discover to keep them here.',
+                        textAlign: TextAlign.center,
+                      ),
                     ],
                   ),
                 ),
@@ -2285,14 +2873,18 @@ class WatchlistPage extends StatelessWidget {
             else if (shows.isEmpty)
               const Expanded(
                 child: Center(
-                  child: Text('Your saved titles are preserved. Open Discover once while online to refresh their details.', textAlign: TextAlign.center),
+                  child: Text(
+                    'Your saved titles are preserved. Open Discover once while online to refresh their details.',
+                    textAlign: TextAlign.center,
+                  ),
                 ),
               )
             else
               Expanded(
                 child: ListView.separated(
                   itemCount: shows.length,
-                  separatorBuilder: (context, index) => const SizedBox(height: 14),
+                  separatorBuilder: (context, index) =>
+                      const SizedBox(height: 14),
                   itemBuilder: (context, index) {
                     final show = shows[index];
                     return ResultCard(
@@ -2318,6 +2910,7 @@ class ProfilePage extends StatelessWidget {
     required this.region,
     required this.services,
     required this.preferredGenres,
+    required this.hideKidsFamilyAnimation,
     required this.completedOnly,
     required this.watchedCount,
     required this.dismissedCount,
@@ -2327,6 +2920,7 @@ class ProfilePage extends StatelessWidget {
     required this.onRegionChanged,
     required this.onServicesChanged,
     required this.onPreferredGenresChanged,
+    required this.onHideKidsFamilyAnimationChanged,
     required this.onCompletedOnlyChanged,
     required this.onRestoreDismissed,
     required this.onReset,
@@ -2337,6 +2931,7 @@ class ProfilePage extends StatelessWidget {
   final String region;
   final Set<String> services;
   final Set<String> preferredGenres;
+  final bool hideKidsFamilyAnimation;
   final bool completedOnly;
   final int watchedCount;
   final int dismissedCount;
@@ -2346,17 +2941,32 @@ class ProfilePage extends StatelessWidget {
   final ValueChanged<String> onRegionChanged;
   final ValueChanged<Set<String>> onServicesChanged;
   final ValueChanged<Set<String>> onPreferredGenresChanged;
+  final ValueChanged<bool> onHideKidsFamilyAnimationChanged;
   final ValueChanged<bool> onCompletedOnlyChanged;
   final Future<void> Function(int id) onRestoreDismissed;
   final Future<void> Function() onReset;
 
   static const serviceOptions = <String>[
-    'Netflix', 'Prime Video', 'Apple TV+', 'Disney+', 'HBO Max', 'Showmax', 'DStv Stream',
+    'Netflix',
+    'Prime Video',
+    'Apple TV+',
+    'Disney+',
+    'HBO Max',
+    'Showmax',
+    'DStv Stream',
   ];
 
   static const regions = <String, String>{
-    'ZA': 'South Africa', 'PT': 'Portugal', 'GB': 'United Kingdom', 'US': 'United States',
-    'IE': 'Ireland', 'ES': 'Spain', 'FR': 'France', 'DE': 'Germany', 'AU': 'Australia', 'NZ': 'New Zealand',
+    'ZA': 'South Africa',
+    'PT': 'Portugal',
+    'GB': 'United Kingdom',
+    'US': 'United States',
+    'IE': 'Ireland',
+    'ES': 'Spain',
+    'FR': 'France',
+    'DE': 'Germany',
+    'AU': 'Australia',
+    'NZ': 'New Zealand',
   };
 
   @override
@@ -2367,59 +2977,156 @@ class ProfilePage extends StatelessWidget {
       child: ListView(
         padding: const EdgeInsets.fromLTRB(24, 28, 24, 110),
         children: [
-          Text(_t(languageCode, 'profileTitle'), style: Theme.of(context).textTheme.headlineLarge),
+          Text(
+            _t(languageCode, 'profileTitle'),
+            style: Theme.of(context).textTheme.headlineLarge,
+          ),
           const SizedBox(height: 8),
-          const Text('Your choices now stay on this device and shape future recommendations.'),
+          const Text(
+            'Your choices now stay on this device and shape future recommendations.',
+          ),
           const SizedBox(height: 24),
-          Row(children: [
-            Expanded(child: _TasteStat(label: 'Watched', value: '$watchedCount', icon: Icons.visibility_rounded)),
-            const SizedBox(width: 12),
-            Expanded(child: _TasteStat(label: 'Dismissed', value: '$dismissedCount', icon: Icons.hide_source_rounded)),
-          ]),
+          Row(
+            children: [
+              Expanded(
+                child: _TasteStat(
+                  label: 'Watched',
+                  value: '$watchedCount',
+                  icon: Icons.visibility_rounded,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _TasteStat(
+                  label: 'Dismissed',
+                  value: '$dismissedCount',
+                  icon: Icons.hide_source_rounded,
+                ),
+              ),
+            ],
+          ),
           if (topFeedback.isNotEmpty) ...[
             const SizedBox(height: 24),
-            Text('What we have learned', style: Theme.of(context).textTheme.titleLarge),
+            Text(
+              'What we have learned',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
             const SizedBox(height: 12),
             Wrap(
               spacing: 8,
               runSpacing: 8,
-              children: topFeedback.take(5).map((entry) => Chip(label: Text('${entry.key} · ${entry.value}'))).toList(),
+              children: topFeedback
+                  .take(5)
+                  .map(
+                    (entry) =>
+                        Chip(label: Text('${entry.key} · ${entry.value}')),
+                  )
+                  .toList(),
             ),
           ],
           const SizedBox(height: 30),
-          Text('Favourite genres', style: Theme.of(context).textTheme.titleLarge),
+          Text(
+            'Favourite genres',
+            style: Theme.of(context).textTheme.titleLarge,
+          ),
           const SizedBox(height: 8),
-          const Text('Choose what you genuinely enjoy. These shape For You and gently break ties in search; an explicit search always wins.'),
+          const Text(
+            'Choose what you genuinely enjoy. These shape For You and gently break ties in search; an explicit search always wins.',
+          ),
           const SizedBox(height: 14),
           Wrap(
             spacing: 10,
             runSpacing: 12,
-            children: const <String>['Documentary', 'Crime', 'Thriller', 'Mystery', 'Comedy', 'Drama', 'Action', 'Adventure', 'Science-Fiction', 'Horror', 'Romance', 'Fantasy', 'Animation', 'Family', 'Reality', 'History', 'Sports'].map((genre) {
-              final selected = preferredGenres.contains(genre);
-              return FilterChip(
-                selected: selected,
-                label: Text(genre),
-                onSelected: (_) {
-                  final updated = {...preferredGenres};
-                  if (!updated.add(genre)) updated.remove(genre);
-                  onPreferredGenresChanged(updated);
-                },
-              );
-            }).toList(),
+            children:
+                const <String>[
+                  'Documentary',
+                  'Crime',
+                  'Thriller',
+                  'Mystery',
+                  'Comedy',
+                  'Drama',
+                  'Action',
+                  'Adventure',
+                  'Science-Fiction',
+                  'Horror',
+                  'Romance',
+                  'Fantasy',
+                  'Animation',
+                  'Family',
+                  'Reality',
+                  'History',
+                  'Sports',
+                ].map((genre) {
+                  final selected = preferredGenres.contains(genre);
+                  return FilterChip(
+                    selected: selected,
+                    label: Text(genre),
+                    onSelected: (_) {
+                      final updated = {...preferredGenres};
+                      if (!updated.add(genre)) updated.remove(genre);
+                      onPreferredGenresChanged(updated);
+                    },
+                  );
+                }).toList(),
+          ),
+          const SizedBox(height: 24),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+            decoration: BoxDecoration(
+              color: const Color(0xFF15111D),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: const Color(0xFF2C153D)),
+            ),
+            child: SwitchListTile.adaptive(
+              contentPadding: EdgeInsets.zero,
+              title: const Text(
+                'Hide kids & family animation',
+                style: TextStyle(fontWeight: FontWeight.w800),
+              ),
+              subtitle: const Padding(
+                padding: EdgeInsets.only(top: 5),
+                child: Text(
+                  'Keep kids and family animation out of For You recommendations.',
+                ),
+              ),
+              value: hideKidsFamilyAnimation,
+              onChanged: onHideKidsFamilyAnimationChanged,
+            ),
           ),
           const SizedBox(height: 30),
-          Text(_t(languageCode, 'streamingRegion'), style: Theme.of(context).textTheme.titleLarge),
+          Text(
+            _t(languageCode, 'streamingRegion'),
+            style: Theme.of(context).textTheme.titleLarge,
+          ),
           const SizedBox(height: 12),
           DropdownButtonFormField<String>(
             initialValue: region,
-            decoration: const InputDecoration(filled: true, fillColor: Color(0xFF15111D), prefixIcon: Icon(Icons.public_rounded)),
-            items: regions.entries.map((entry) => DropdownMenuItem(value: entry.key, child: Text(entry.value))).toList(),
-            onChanged: (value) { if (value != null) onRegionChanged(value); },
+            decoration: const InputDecoration(
+              filled: true,
+              fillColor: Color(0xFF15111D),
+              prefixIcon: Icon(Icons.public_rounded),
+            ),
+            items: regions.entries
+                .map(
+                  (entry) => DropdownMenuItem(
+                    value: entry.key,
+                    child: Text(entry.value),
+                  ),
+                )
+                .toList(),
+            onChanged: (value) {
+              if (value != null) onRegionChanged(value);
+            },
           ),
           const SizedBox(height: 30),
-          Text(_t(languageCode, 'streamingServices'), style: Theme.of(context).textTheme.titleLarge),
+          Text(
+            _t(languageCode, 'streamingServices'),
+            style: Theme.of(context).textTheme.titleLarge,
+          ),
           const SizedBox(height: 8),
-          const Text('Leave all services off to search everywhere. Select one or more to show only titles whose availability is verified for your streaming region.'),
+          const Text(
+            'Leave all services off to search everywhere. Select one or more to show only titles whose availability is verified for your streaming region.',
+          ),
           const SizedBox(height: 14),
           Wrap(
             spacing: 10,
@@ -2429,7 +3136,11 @@ class ProfilePage extends StatelessWidget {
                 selected: services.isEmpty,
                 label: const Text('Any service'),
                 selectedColor: const Color(0xFF4FD5CB),
-                labelStyle: TextStyle(color: services.isEmpty ? const Color(0xFF091310) : Colors.white),
+                labelStyle: TextStyle(
+                  color: services.isEmpty
+                      ? const Color(0xFF091310)
+                      : Colors.white,
+                ),
                 onSelected: (_) => onServicesChanged(<String>{}),
               ),
               ...serviceOptions.map((service) {
@@ -2438,7 +3149,9 @@ class ProfilePage extends StatelessWidget {
                   selected: selected,
                   label: Text(service),
                   selectedColor: const Color(0xFF4FD5CB),
-                  labelStyle: TextStyle(color: selected ? const Color(0xFF091310) : Colors.white),
+                  labelStyle: TextStyle(
+                    color: selected ? const Color(0xFF091310) : Colors.white,
+                  ),
                   onSelected: (_) {
                     final updated = {...services};
                     if (!updated.add(service)) updated.remove(service);
@@ -2453,7 +3166,9 @@ class ProfilePage extends StatelessWidget {
             contentPadding: EdgeInsets.zero,
             value: completedOnly,
             title: const Text('Finished series only'),
-            subtitle: const Text('Only recommend series that have finished airing.'),
+            subtitle: const Text(
+              'Only recommend series that have finished airing.',
+            ),
             onChanged: onCompletedOnlyChanged,
           ),
           const Divider(height: 42),
@@ -2461,57 +3176,75 @@ class ProfilePage extends StatelessWidget {
             contentPadding: EdgeInsets.zero,
             leading: const Icon(Icons.hide_source_rounded),
             title: const Text('Not interested'),
-            subtitle: Text(dismissedIds.isEmpty
-                ? 'No dismissed titles.'
-                : '${dismissedIds.length} dismissed title${dismissedIds.length == 1 ? '' : 's'}. Tap to review or restore.'),
+            subtitle: Text(
+              dismissedIds.isEmpty
+                  ? 'No dismissed titles.'
+                  : '${dismissedIds.length} dismissed title${dismissedIds.length == 1 ? '' : 's'}. Tap to review or restore.',
+            ),
             trailing: const Icon(Icons.chevron_right_rounded),
-            onTap: dismissedIds.isEmpty ? null : () {
-              showModalBottomSheet<void>(
-                context: context,
-                isScrollControlled: true,
-                showDragHandle: true,
-                backgroundColor: const Color(0xFF15111D),
-                builder: (sheetContext) => SafeArea(
-                  child: SizedBox(
-                    height: MediaQuery.sizeOf(sheetContext).height * 0.7,
-                    child: ListView(
-                      padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
-                      children: [
-                        Text('Not interested', style: Theme.of(sheetContext).textTheme.headlineSmall),
-                        const SizedBox(height: 6),
-                        const Text('These titles are excluded from future recommendations. Restore one if you dismissed it by mistake.'),
-                        const SizedBox(height: 12),
-                        for (final id in dismissedIds)
-                          ListTile(
-                            contentPadding: EdgeInsets.zero,
-                            title: Text(knownShows[id]?.title ?? 'Title #$id'),
-                            trailing: TextButton(
-                              onPressed: () async {
-                                await onRestoreDismissed(id);
-                                if (sheetContext.mounted) Navigator.pop(sheetContext);
-                              },
-                              child: const Text('Restore'),
-                            ),
+            onTap: dismissedIds.isEmpty
+                ? null
+                : () {
+                    showModalBottomSheet<void>(
+                      context: context,
+                      isScrollControlled: true,
+                      showDragHandle: true,
+                      backgroundColor: const Color(0xFF15111D),
+                      builder: (sheetContext) => SafeArea(
+                        child: SizedBox(
+                          height: MediaQuery.sizeOf(sheetContext).height * 0.7,
+                          child: ListView(
+                            padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
+                            children: [
+                              Text(
+                                'Not interested',
+                                style: Theme.of(
+                                  sheetContext,
+                                ).textTheme.headlineSmall,
+                              ),
+                              const SizedBox(height: 6),
+                              const Text(
+                                'These titles are excluded from future recommendations. Restore one if you dismissed it by mistake.',
+                              ),
+                              const SizedBox(height: 12),
+                              for (final id in dismissedIds)
+                                ListTile(
+                                  contentPadding: EdgeInsets.zero,
+                                  title: Text(
+                                    knownShows[id]?.title ?? 'Title #$id',
+                                  ),
+                                  trailing: TextButton(
+                                    onPressed: () async {
+                                      await onRestoreDismissed(id);
+                                      if (sheetContext.mounted)
+                                        Navigator.pop(sheetContext);
+                                    },
+                                    child: const Text('Restore'),
+                                  ),
+                                ),
+                            ],
                           ),
-                      ],
-                    ),
-                  ),
-                ),
-              );
-            },
+                        ),
+                      ),
+                    );
+                  },
           ),
           const ListTile(
             contentPadding: EdgeInsets.zero,
             leading: Icon(Icons.info_outline_rounded),
             title: Text('Data sources & terms'),
-            subtitle: Text('Catalogue data is provided by TVMaze. Streaming availability uses Streaming Availability API (Movie of the Night). Availability can vary by region and provider.'),
+            subtitle: Text(
+              'Catalogue data is provided by TVMaze. Streaming availability uses Streaming Availability API (Movie of the Night). Availability can vary by region and provider.',
+            ),
           ),
           const Divider(height: 42),
           ListTile(
             contentPadding: EdgeInsets.zero,
             leading: const Icon(Icons.restart_alt_rounded),
             title: Text(_t(languageCode, 'reset')),
-            subtitle: const Text('Clear saved preferences, learning, watch history and local watchlist.'),
+            subtitle: const Text(
+              'Clear saved preferences, learning, watch history and local watchlist.',
+            ),
             onTap: () async {
               final confirmed = await showDialog<bool>(
                 context: context,
@@ -2519,8 +3252,14 @@ class ProfilePage extends StatelessWidget {
                   title: const Text('Reset personalisation?'),
                   content: const Text('This cannot be undone.'),
                   actions: [
-                    TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('Cancel')),
-                    FilledButton(onPressed: () => Navigator.pop(dialogContext, true), child: const Text('Reset')),
+                    TextButton(
+                      onPressed: () => Navigator.pop(dialogContext, false),
+                      child: const Text('Cancel'),
+                    ),
+                    FilledButton(
+                      onPressed: () => Navigator.pop(dialogContext, true),
+                      child: const Text('Reset'),
+                    ),
                   ],
                 ),
               );
@@ -2531,7 +3270,9 @@ class ProfilePage extends StatelessWidget {
             contentPadding: EdgeInsets.zero,
             leading: Icon(Icons.lock_outline_rounded),
             title: Text('Stored locally'),
-            subtitle: Text('Your preferences are saved securely on this device.'),
+            subtitle: Text(
+              'Your preferences are saved securely on this device.',
+            ),
           ),
         ],
       ),
@@ -2540,7 +3281,11 @@ class ProfilePage extends StatelessWidget {
 }
 
 class _TasteStat extends StatelessWidget {
-  const _TasteStat({required this.label, required this.value, required this.icon});
+  const _TasteStat({
+    required this.label,
+    required this.value,
+    required this.icon,
+  });
   final String label;
   final String value;
   final IconData icon;
@@ -2553,12 +3298,17 @@ class _TasteStat extends StatelessWidget {
       borderRadius: BorderRadius.circular(20),
       border: Border.all(color: const Color(0xFF2B2633)),
     ),
-    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Icon(icon, color: const Color(0xFFD7B8FF)),
-      const SizedBox(height: 12),
-      Text(value, style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w900)),
-      Text(label, style: const TextStyle(color: Color(0xFF9893A3))),
-    ]),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, color: const Color(0xFFD7B8FF)),
+        const SizedBox(height: 12),
+        Text(
+          value,
+          style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w900),
+        ),
+        Text(label, style: const TextStyle(color: Color(0xFF9893A3))),
+      ],
+    ),
   );
 }
-

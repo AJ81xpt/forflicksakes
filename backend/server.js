@@ -227,6 +227,9 @@ function readLastVerifiedAvailability(showId, region) {
 function availabilityFallback(showId, region, message) {
   const stale = readLastVerifiedAvailability(showId, region);
   if (stale) return stale;
+
+  const quotaBlocked = availabilityQuotaBlockedUntil > Date.now();
+
   return {
     region,
     checkedAt: new Date().toISOString(),
@@ -234,10 +237,18 @@ function availabilityFallback(showId, region, message) {
     verified: false,
     providers: [],
     attribution: 'Streaming availability by Streaming Availability API (Movie of the Night).',
-    message,
+    message: quotaBlocked
+      ? 'Streaming options are unavailable right now. We will show services here when availability can be verified.'
+      : message,
+    quotaBlocked,
+    retryAfterSeconds: quotaBlocked
+      ? Math.max(
+          1,
+          Math.ceil((availabilityQuotaBlockedUntil - Date.now()) / 1000),
+        )
+      : null,
   };
 }
-
 function streamingOptionToProvider(option) {
   const service = option?.service || {};
   const link = option?.link || option?.videoLink || service?.homePage || null;
