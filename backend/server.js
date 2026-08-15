@@ -376,7 +376,7 @@ async function resolveAvailability({ showId, region }) {
         return availabilityFallback(
           showId,
           normalizedRegion,
-          'Streaming availability is temporarily rate limited. Try again shortly.',
+          'Streaming availability could not be verified right now. Please check again later.',
         );
       }
 
@@ -432,7 +432,7 @@ async function resolveAvailability({ showId, region }) {
       return availabilityFallback(
         showId,
         normalizedRegion,
-        'Streaming availability is temporarily unavailable. Try again later.',
+        'Streaming availability could not be verified right now. Please check again later.',
       );
     }
   })();
