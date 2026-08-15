@@ -202,6 +202,7 @@ function rememberVerifiedAvailability(showId, region, value) {
     expiresAt: Date.now() + AVAILABILITY_STALE_TTL_MS,
     value: { ...value, cached: false },
   });
+  persistAvailabilityCache();
   return value;
 }
 
