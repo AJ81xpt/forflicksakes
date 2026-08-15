@@ -82,6 +82,8 @@ const availabilityInFlight = new Map();
 const AVAILABILITY_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const AVAILABILITY_NEGATIVE_TTL_MS = 5 * 60 * 1000;
 const AVAILABILITY_STALE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+const AVAILABILITY_QUOTA_COOLDOWN_MS = 6 * 60 * 60 * 1000;
+let availabilityQuotaBlockedUntil = 0;
 const availabilityLastVerified = new Map();
 
 const SUPPORTED_AVAILABILITY_REGIONS = new Set([
@@ -195,6 +197,7 @@ function dedupeProviders(providers) {
 }
 
 async function streamingAvailabilityShow(imdbId, region) {
+  if (availabilityQuotaBlockedUntil > Date.now()) return { kind: 'quota' };
   const url = new URL(`https://api.movieofthenight.com/v4/shows/${encodeURIComponent(imdbId)}`);
   url.searchParams.set('country', String(region).toLowerCase());
   url.searchParams.set('series_granularity', 'show');
@@ -210,7 +213,11 @@ async function streamingAvailabilityShow(imdbId, region) {
 
   if (response.status === 401 || response.status === 403) return { kind: 'auth' };
   if (response.status === 404) return { kind: 'not-found' };
-  if (response.status === 429) return { kind: 'quota' };
+  if (response.status === 429) {
+    availabilityQuotaBlockedUntil = Date.now() + AVAILABILITY_QUOTA_COOLDOWN_MS;
+    console.warn('[AVAILABILITY] quota exhausted; external availability paused for 6 hours');
+    return { kind: 'quota' };
+  }
   if (!response.ok) {
     const error = new Error(`Streaming Availability API returned ${response.status}`);
     error.status = response.status;
@@ -414,6 +421,7 @@ function writeDiscoverySearchCache(key, value) {
 }
 
 async function streamingAvailabilityFilterSearch({ country, keyword, genres, catalogs }) {
+  if (availabilityQuotaBlockedUntil > Date.now()) return [];
   if (!streamingAvailabilityKey) return [];
   const url = new URL('https://api.movieofthenight.com/v4/shows/search/filters');
   url.searchParams.set('country', String(country).toLowerCase());
@@ -436,7 +444,12 @@ async function streamingAvailabilityFilterSearch({ country, keyword, genres, cat
   });
 
   if (!response.ok) {
-    if ([401, 403, 429].includes(response.status)) return [];
+    if (response.status === 429) {
+    availabilityQuotaBlockedUntil = Date.now() + AVAILABILITY_QUOTA_COOLDOWN_MS;
+    console.warn('[DISCOVERY] availability quota exhausted; provider discovery paused for 6 hours');
+    return [];
+  }
+  if ([401, 403].includes(response.status)) return [];
     throw new Error(`Discovery search returned ${response.status}`);
   }
   const data = await response.json();

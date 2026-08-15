@@ -23,7 +23,7 @@ const _ffsText = <String, Map<String, String>>{
     'watchlistEmpty': 'For Flick Sakes... save something worth watching.',
     'profileTitle': 'Profile & taste',
     'streamingRegion': 'Streaming region',
-    'streamingServices': 'Streaming services',
+    'streamingServices': 'Preferred streaming services',
     'stored': 'Stored on this device',
     'storedBody': 'Your preferences, watch history and watchlist stay on this device.',
     'reset': 'Reset personalisation',
@@ -468,7 +468,7 @@ class _DiscoverPageState extends State<DiscoverPage> {
         _interpretation = recommendation.interpretation;
         _loading = false;
         if (_results.isEmpty) {
-          _error = 'We couldn''t find a strong match for that yet. Try a broader search or change your streaming services.';
+          _error = 'We couldn\'t find a strong match for that yet. Try a broader search or choose Any service.';
         }
       });
     } catch (error, stackTrace) {
