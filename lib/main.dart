@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'dart:io';
 
+import 'package:app_links/app_links.dart';
 import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -176,6 +178,10 @@ class AppShell extends StatefulWidget {
 
 class _AppShellState extends State<AppShell> {
   final PersonalizationStore _personalization = PersonalizationStore();
+  final AppLinks _appLinks = AppLinks();
+  final ApiService _deepLinkApi = ApiService();
+  StreamSubscription<Uri>? _linkSubscription;
+  bool _handlingDeepLink = false;
   int _index = 0;
   bool _loadingProfile = true;
   String _region = 'ZA';
@@ -193,6 +199,73 @@ class _AppShellState extends State<AppShell> {
   void initState() {
     super.initState();
     _loadPersonalization();
+    _initDeepLinks();
+  }
+
+  void _initDeepLinks() {
+    _linkSubscription = _appLinks.uriLinkStream.listen(
+      _handleDeepLink,
+      onError: (Object error) {
+        debugPrint('Deep link error: $error');
+      },
+    );
+  }
+
+  Future<void> _handleDeepLink(Uri uri) async {
+    if (_handlingDeepLink) return;
+
+    if (uri.scheme != 'https' ||
+        uri.host.toLowerCase() != 'forflicksakes.com' ||
+        uri.pathSegments.length != 2 ||
+        uri.pathSegments.first != 'show') {
+      return;
+    }
+
+    final showId = int.tryParse(uri.pathSegments[1]);
+
+    if (showId == null || showId <= 0) return;
+
+    _handlingDeepLink = true;
+
+    try {
+      final show = await _deepLinkApi.showById(showId: showId);
+
+      if (!mounted) return;
+
+      await _rememberShows(<ShowItem>[show]);
+
+      if (!mounted) return;
+
+      await Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => ShowDetailPage(
+            show: show,
+            region: _region,
+            saved: _saved.contains(show.id),
+            onToggleSaved: () => _toggleSaved(show.id),
+            onLocalFeedback: (reason) => _recordLocalFeedback(show.id, reason),
+          ),
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('That shared series could not be opened right now.'),
+        ),
+      );
+
+      debugPrint('Deep link show lookup failed: $error');
+    } finally {
+      _handlingDeepLink = false;
+    }
+  }
+
+  @override
+  void dispose() {
+    _linkSubscription?.cancel();
+    super.dispose();
   }
 
   Future<void> _loadPersonalization() async {
@@ -1732,7 +1805,7 @@ class _ShowDetailPageState extends State<ShowDetailPage> {
       'For Flick Sakes... ${show.title} looks worth watching.',
       if (show.year > 0) 'Released ${show.year}.',
       if (show.rating > 0) 'Rating: ${show.rating}/10.',
-      if (show.officialUrl != null) show.officialUrl!,
+      'https://forflicksakes.com/show/${show.id}',
     ].join(' ');
     final box = shareContext.findRenderObject() as RenderBox?;
     await SharePlus.instance.share(
@@ -2958,6 +3031,7 @@ class ProfilePage extends StatelessWidget {
 
   static const regions = <String, String>{
     'ZA': 'South Africa',
+    'MY': 'Malaysia',
     'PT': 'Portugal',
     'GB': 'United Kingdom',
     'US': 'United States',

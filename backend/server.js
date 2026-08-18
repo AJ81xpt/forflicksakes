@@ -168,7 +168,7 @@ function persistAvailabilityCache() {
 }
 
 const SUPPORTED_AVAILABILITY_REGIONS = new Set([
-  'ZA', 'GB', 'US',
+  'ZA', 'GB', 'US', 'MY',
   'AT', 'BE', 'BG', 'HR', 'CY', 'CZ', 'DK', 'EE', 'FI', 'FR', 'DE', 'GR',
   'HU', 'IE', 'IT', 'LV', 'LT', 'LU', 'MT', 'NL', 'PL', 'PT', 'RO', 'SK',
   'SI', 'ES', 'SE',
@@ -1543,6 +1543,27 @@ function normalizeProviderName(name = '') {
   return value;
 }
 
+
+app.get('/shows/:id', async (request, response) => {
+  try {
+    const showId = Number(request.params.id);
+
+    if (!Number.isFinite(showId) || showId <= 0) {
+      return response.status(400).json({ error: 'Invalid show id.' });
+    }
+
+    const show = await tvMazeShow(showId);
+
+    if (!show?.id) {
+      return response.status(404).json({ error: 'Show not found.' });
+    }
+
+    return response.json(toShowItem(show));
+  } catch (error) {
+    console.error('Show lookup failed:', error);
+    return response.status(502).json({ error: 'Show lookup failed.' });
+  }
+});
 
 app.get('/shows/:id/details', async (request, response) => {
   try {

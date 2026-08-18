@@ -23,19 +23,17 @@ class ApiService {
     required Set<int> excludedIds,
     Set<String> preferredGenres = const <String>{},
   }) {
-    return _recommend(
-      <String, dynamic>{
-        'mode': 'prompt',
-        'query': query,
-        'profile': _profile(
-          region,
-          services,
-          completedOnly,
-          excludedIds,
-          preferredGenres,
-        ),
-      },
-    );
+    return _recommend(<String, dynamic>{
+      'mode': 'prompt',
+      'query': query,
+      'profile': _profile(
+        region,
+        services,
+        completedOnly,
+        excludedIds,
+        preferredGenres,
+      ),
+    });
   }
 
   Future<RecommendationResult> continueTheVibe({
@@ -68,19 +66,17 @@ class ApiService {
     required Set<int> excludedIds,
     Set<String> preferredGenres = const <String>{},
   }) {
-    return _recommend(
-      <String, dynamic>{
-        'mode': 'mood',
-        'mood': mood.toLowerCase(),
-        'profile': _profile(
-          region,
-          services,
-          completedOnly,
-          excludedIds,
-          preferredGenres,
-        ),
-      },
-    );
+    return _recommend(<String, dynamic>{
+      'mode': 'mood',
+      'mood': mood.toLowerCase(),
+      'profile': _profile(
+        region,
+        services,
+        completedOnly,
+        excludedIds,
+        preferredGenres,
+      ),
+    });
   }
 
   Map<String, dynamic> _profile(
@@ -99,15 +95,11 @@ class ApiService {
     };
   }
 
-  Future<RecommendationResult> _recommend(
-    Map<String, dynamic> body,
-  ) async {
+  Future<RecommendationResult> _recommend(Map<String, dynamic> body) async {
     final response = await _client
         .post(
           Uri.parse('$_baseUrl/recommendations'),
-          headers: const <String, String>{
-            'Content-Type': 'application/json',
-          },
+          headers: const <String, String>{'Content-Type': 'application/json'},
           body: jsonEncode(body),
         )
         .timeout(
@@ -120,17 +112,14 @@ class ApiService {
           },
         );
 
-    debugPrint(
-      'RECOMMEND RESPONSE ${response.statusCode}: ${response.body}',
-    );
+    debugPrint('RECOMMEND RESPONSE ${response.statusCode}: ${response.body}');
 
     if (response.statusCode != 200) {
       String message =
           'Recommendation service returned ${response.statusCode}.';
 
       try {
-        final json =
-            jsonDecode(response.body) as Map<String, dynamic>;
+        final json = jsonDecode(response.body) as Map<String, dynamic>;
         message = json['error'] as String? ?? message;
       } catch (_) {
         // Keep the generic error message.
@@ -156,20 +145,16 @@ class ApiService {
     final response = await _client
         .post(
           Uri.parse('$_baseUrl/feedback'),
-          headers: const <String, String>{
-            'Content-Type': 'application/json',
-          },
-          body: jsonEncode(
-            <String, dynamic>{
-              'type': type,
-              'reason': reason,
-              'showId': showId,
-              'mode': mode,
-              'mood': mood,
-              'query': query,
-              'resultIds': resultIds,
-            },
-          ),
+          headers: const <String, String>{'Content-Type': 'application/json'},
+          body: jsonEncode(<String, dynamic>{
+            'type': type,
+            'reason': reason,
+            'showId': showId,
+            'mode': mode,
+            'mood': mood,
+            'query': query,
+            'resultIds': resultIds,
+          }),
         )
         .timeout(
           const Duration(seconds: 10),
@@ -178,19 +163,42 @@ class ApiService {
           },
         );
 
-    if (response.statusCode < 200 ||
-        response.statusCode >= 300) {
+    if (response.statusCode < 200 || response.statusCode >= 300) {
       throw Exception('Feedback could not be saved.');
     }
   }
 
-  Future<ShowDetails> showDetails({
-    required int showId,
-  }) async {
+  Future<ShowItem> showById({required int showId}) async {
     final response = await _client
-        .get(
-          Uri.parse('$_baseUrl/shows/$showId/details'),
-        )
+        .get(Uri.parse('$_baseUrl/shows/$showId'))
+        .timeout(
+          const Duration(seconds: 30),
+          onTimeout: () {
+            throw Exception(
+              'Show lookup is taking longer than usual. Please try again.',
+            );
+          },
+        );
+
+    if (response.statusCode != 200) {
+      String message = 'Show lookup returned ${response.statusCode}.';
+
+      try {
+        final json = jsonDecode(response.body) as Map<String, dynamic>;
+        message = json['error'] as String? ?? message;
+      } catch (_) {
+        // Keep generic message.
+      }
+
+      throw Exception(message);
+    }
+
+    return ShowItem.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
+  }
+
+  Future<ShowDetails> showDetails({required int showId}) async {
+    final response = await _client
+        .get(Uri.parse('$_baseUrl/shows/$showId/details'))
         .timeout(
           const Duration(seconds: 60),
           onTimeout: () {
@@ -201,17 +209,13 @@ class ApiService {
           },
         );
 
-    debugPrint(
-      'RECOMMEND RESPONSE ${response.statusCode}: ${response.body}',
-    );
+    debugPrint('RECOMMEND RESPONSE ${response.statusCode}: ${response.body}');
 
     if (response.statusCode != 200) {
-      String message =
-          'Show details service returned ${response.statusCode}.';
+      String message = 'Show details service returned ${response.statusCode}.';
 
       try {
-        final json =
-            jsonDecode(response.body) as Map<String, dynamic>;
+        final json = jsonDecode(response.body) as Map<String, dynamic>;
         message = json['error'] as String? ?? message;
       } catch (_) {
         // Keep the generic error message.
@@ -256,8 +260,7 @@ class ApiService {
           '${response.statusCode}.';
 
       try {
-        final json =
-            jsonDecode(response.body) as Map<String, dynamic>;
+        final json = jsonDecode(response.body) as Map<String, dynamic>;
         message = json['error'] as String? ?? message;
       } catch (_) {
         // Keep the generic error message.
