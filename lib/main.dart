@@ -1801,13 +1801,18 @@ class _ShowDetailPageState extends State<ShowDetailPage> {
 
   Future<void> _shareShow(BuildContext shareContext) async {
     final show = widget.show;
+
     final details = <String>[
       'For Flick Sakes... ${show.title} looks worth watching.',
       if (show.year > 0) 'Released ${show.year}.',
       if (show.rating > 0) 'Rating: ${show.rating}/10.',
+      '',
+      'Open this series in For Flick Sakes:',
       'https://forflicksakes.com/show/${show.id}',
-    ].join(' ');
+    ].join('\n');
+
     final box = shareContext.findRenderObject() as RenderBox?;
+
     await SharePlus.instance.share(
       ShareParams(
         text: details,
@@ -3041,6 +3046,9 @@ class ProfilePage extends StatelessWidget {
     'DE': 'Germany',
     'AU': 'Australia',
     'NZ': 'New Zealand',
+    'MT': 'Malta',
+    'ID': 'Indonesia',
+    'PH': 'Philippines',
   };
 
   @override
